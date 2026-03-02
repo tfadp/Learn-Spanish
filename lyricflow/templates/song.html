@@ -349,6 +349,9 @@ function songPage(song_id) {
         timestamp_lines: [],
         _sync_time_interval: null,
 
+        /* -- Loop guard (prevents runaway counter) ------------- */
+        _loop_waiting: false,
+
         /* -- Touch gesture ------------------------------------ */
         touch_start_y: 0,
         touch_delta_y: 0,
@@ -509,18 +512,21 @@ function songPage(song_id) {
             this.audio.currentTime = start_sec;
             this.audio.play().catch(err => console.warn('Autoplay blocked:', err));
 
+            this._loop_waiting = false;
             this.loop_interval = setInterval(() => {
-                if (this.is_paused) return;
+                if (this.is_paused || this._loop_waiting) return;
 
                 if (this.audio.currentTime >= end_sec) {
                     this.audio.pause();
                     this.current_loop++;
+                    this._loop_waiting = true;  // block until gap finishes
 
                     // Fire-and-forget: persist loop count
                     fetch('/api/lyrics/' + line.id + '/loop', { method: 'PUT' });
 
                     // ~1 second gap between loops
                     setTimeout(() => {
+                        this._loop_waiting = false;
                         if (!this.show_line_card || this.is_paused) return;
                         this.audio.currentTime = start_sec;
                         this.audio.play().catch(() => {});
@@ -552,8 +558,9 @@ function songPage(song_id) {
             this.audio.currentTime = start_sec;
             this.audio.play().catch(err => console.warn('Autoplay blocked:', err));
 
+            this._loop_waiting = false;
             this.loop_interval = setInterval(() => {
-                if (this.stack_paused) return;
+                if (this.stack_paused || this._loop_waiting) return;
 
                 const current_ms = this.audio.currentTime * 1000;
                 this.update_current_stack_line(current_ms, lines);
@@ -561,8 +568,10 @@ function songPage(song_id) {
                 if (this.audio.currentTime >= end_sec) {
                     this.audio.pause();
                     this.stack_loop++;
+                    this._loop_waiting = true;  // block until gap finishes
 
                     setTimeout(() => {
+                        this._loop_waiting = false;
                         if (!this.show_stack_card || this.stack_paused) return;
                         this.audio.currentTime = start_sec;
                         this.stack_current_id = lines[0].id;
