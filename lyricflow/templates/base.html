@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#08080c">
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/icons/icon-512.svg">
     <title>{% block title %}LyricFlow{% endblock %}</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
@@ -13,5 +15,11 @@
         {% block content %}{% endblock %}
     </div>
     <script src="/static/js/app.js"></script>
+    <script>
+    // Register service worker for PWA support
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js');
+    }
+    </script>
 </body>
 </html>

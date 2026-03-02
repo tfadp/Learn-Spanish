@@ -1,0 +1,12 @@
+.git/
+.claude/
+.pytest_cache/
+__pycache__/
+*.pyc
+*.db
+*.mp3
+lyricflow/.env
+lyricflow/static/uploads/*.mp3
+.DS_Store
+Spec.md
+lyricflow-ux-v2.0.html

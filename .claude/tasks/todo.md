@@ -60,7 +60,7 @@
 - [x] Real NUEVAYoL lyrics: 40 lines inserted, translated, 26 auto-timestamped
 
 ## Next 3 Steps
-1) Initialize git repo + first commit
+1) ~~Initialize git repo + first commit~~ DONE — pushed to GitHub (learn-spanish)
 2) PWA manifest + service worker
 3) Deploy to DigitalOcean
 

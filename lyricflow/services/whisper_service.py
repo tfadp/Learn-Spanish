@@ -12,7 +12,12 @@ Why two separate functions?
 import logging
 import re
 
-import whisper
+try:
+    import whisper
+    WHISPER_AVAILABLE = True
+except ImportError:
+    WHISPER_AVAILABLE = False
+
 from rapidfuzz import fuzz
 
 logger = logging.getLogger(__name__)
@@ -84,6 +89,11 @@ def transcribe_audio(audio_path: str, language: str) -> dict:
         "start", "end", "text", and optionally "words".
         Returns {"segments": []} if transcription fails.
     """
+    if not WHISPER_AVAILABLE:
+        raise WhisperTranscriptionError(
+            "Whisper is not installed on this server. Use tap-to-sync instead."
+        )
+
     code = LANGUAGE_CODES.get(language.lower()) if language else None
 
     try:

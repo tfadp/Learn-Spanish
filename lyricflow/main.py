@@ -11,6 +11,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -61,6 +62,16 @@ app.include_router(lyrics.router, prefix="/api")
 app.include_router(upload.router, prefix="/api")
 app.include_router(translate.router, prefix="/api")
 app.include_router(timestamps.router, prefix="/api")
+
+
+# --- Service worker (must be served from root for full scope) ---
+
+@app.get("/sw.js")
+async def service_worker():
+    return FileResponse(
+        STATIC_DIR / "sw.js",
+        media_type="application/javascript",
+    )
 
 
 # --- Page routes (serve HTML templates) ---
