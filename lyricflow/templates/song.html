@@ -504,13 +504,24 @@ function songPage(song_id) {
             if (line.start_time_ms == null || line.end_time_ms == null) return;
 
             if (!this.audio) this.audio = new Audio();
-            this.audio.src = '/' + this.song.audio_file_path;
-
+            const src = '/' + this.song.audio_file_path;
             const start_sec = line.start_time_ms / 1000;
             const end_sec = line.end_time_ms / 1000;
 
-            this.audio.currentTime = start_sec;
-            this.audio.play().catch(err => console.warn('Autoplay blocked:', err));
+            // Seek to start and begin playing + polling
+            const beginLoop = () => {
+                this.audio.currentTime = start_sec;
+                this.audio.play().catch(err => console.warn('Autoplay blocked:', err));
+            };
+
+            // Only reload audio if source changed; wait for load before seeking
+            const needs_load = !this.audio.src || !this.audio.src.includes(this.song.audio_file_path);
+            if (needs_load) {
+                this.audio.src = src;
+                this.audio.addEventListener('loadedmetadata', beginLoop, { once: true });
+            } else {
+                beginLoop();
+            }
 
             this._loop_waiting = false;
             this.loop_interval = setInterval(() => {
@@ -550,13 +561,22 @@ function songPage(song_id) {
             if (first_line.start_time_ms == null || last_line.end_time_ms == null) return;
 
             if (!this.audio) this.audio = new Audio();
-            this.audio.src = '/' + this.song.audio_file_path;
-
+            const src = '/' + this.song.audio_file_path;
             const start_sec = first_line.start_time_ms / 1000;
             const end_sec = last_line.end_time_ms / 1000;
 
-            this.audio.currentTime = start_sec;
-            this.audio.play().catch(err => console.warn('Autoplay blocked:', err));
+            const beginLoop = () => {
+                this.audio.currentTime = start_sec;
+                this.audio.play().catch(err => console.warn('Autoplay blocked:', err));
+            };
+
+            const needs_load = !this.audio.src || !this.audio.src.includes(this.song.audio_file_path);
+            if (needs_load) {
+                this.audio.src = src;
+                this.audio.addEventListener('loadedmetadata', beginLoop, { once: true });
+            } else {
+                beginLoop();
+            }
 
             this._loop_waiting = false;
             this.loop_interval = setInterval(() => {
