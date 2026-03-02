@@ -1,7 +1,7 @@
 # todo.md — Roadmap
 
 ## Session State
-- branch: (no git repo yet)
+- branch: main (ca77ca6)
 - last_test: 13/13 pytest tests passing (2026-03-02)
 - blocked: none
 - pending_decisions: none
