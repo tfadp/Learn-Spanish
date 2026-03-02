@@ -1,0 +1,509 @@
+{% extends "base.html" %}
+
+{% block title %}Song — LyricFlow{% endblock %}
+
+{% block content %}
+<!--
+    Main learning screen: Checklist + Slide-up Card (Line & Stack modes).
+    Self-contained: audio engine, touch gestures, mastery — all inline.
+    song_id injected by FastAPI via Jinja2 context.
+-->
+<div x-data="songPage({{ song_id }})" x-init="load_song()">
+
+    <!-- ===== CHECKLIST HEADER ===== -->
+    <header class="checklist-header">
+        <a href="/" class="back-btn" aria-label="Back to library">
+            &#8592;
+        </a>
+        <div class="checklist-title">
+            <h1 x-text="song.title || 'Loading...'"></h1>
+            <div class="artist-label" x-text="song.artist || ''"></div>
+        </div>
+        <span class="mastery-count" x-text="mastered_count + '/' + lines.length + ' &#10003;'"></span>
+    </header>
+
+    <!-- ===== LINE LIST ===== -->
+    <section class="line-list" aria-label="Lyric lines">
+        <template x-for="line in lines" :key="line.id">
+            <div
+                class="line-item"
+                :class="{
+                    mastered: line.is_mastered,
+                    active: active_line_id === line.id,
+                    'flash-green': just_mastered_id === line.id
+                }"
+                @click="open_line_card(line)"
+            >
+                <span class="line-marker">
+                    <template x-if="line.is_mastered">
+                        <span>&#10004;</span>
+                    </template>
+                    <template x-if="!line.is_mastered">
+                        <span x-text="line.line_number"></span>
+                    </template>
+                </span>
+                <span class="line-text" x-text="line.original_text"></span>
+            </div>
+        </template>
+    </section>
+
+    <!-- ===== STACK SECTION ===== -->
+    <section class="stack-section" x-show="lines.length > 1">
+        <h3>Stack &amp; Play</h3>
+        <div class="stack-buttons">
+            <template x-for="n in stack_range()" :key="n">
+                <button
+                    class="stack-btn"
+                    :class="stack_available(n) ? 'available' : 'locked'"
+                    :disabled="!stack_available(n)"
+                    @click="stack_available(n) && open_stack(1, n)"
+                    x-text="'Play 1\u2013' + n"
+                ></button>
+            </template>
+        </div>
+    </section>
+
+    <!-- ===== SLIDE-UP CARD: LINE MODE ===== -->
+    <div
+        class="card-overlay"
+        :class="{ hidden: !show_line_card }"
+        @click="close_card()"
+    ></div>
+
+    <div
+        class="slide-card"
+        :class="show_line_card ? 'open' : 'closed'"
+        @touchstart="handle_touch_start($event)"
+        @touchmove.prevent="handle_touch_move($event)"
+        @touchend="handle_touch_end($event)"
+    >
+        <div class="card-handle"></div>
+
+        <div class="card-song-title" x-text="song.title"></div>
+        <div class="card-loop-counter" x-text="'\uD83D\uDD01 Loop ' + current_loop"></div>
+
+        <div class="card-line-number" x-show="current_line">
+            <span x-text="'LINE ' + (current_line ? current_line.line_number : '')"></span>
+        </div>
+
+        <div class="card-line-text" x-text="current_line ? current_line.original_text : ''"></div>
+
+        <!-- Translation: visible by default, tap to toggle (SPECS.md domain rule) -->
+        <div
+            class="card-translation"
+            :class="{ hidden: translation_hidden }"
+            @click="translation_hidden = !translation_hidden"
+            x-text="current_line ? (current_line.translation || 'Translation pending...') : ''"
+        ></div>
+
+        <!-- Loop dots: up to 10 dots, then show number -->
+        <div class="loop-dots">
+            <template x-if="current_loop <= max_dots">
+                <div style="display:flex; align-items:center; justify-content:center; gap:6px;">
+                    <template x-for="i in max_dots" :key="i">
+                        <span class="loop-dot" :class="{ active: i <= current_loop }"></span>
+                    </template>
+                </div>
+            </template>
+            <template x-if="current_loop > max_dots">
+                <span class="loop-count-number" x-text="current_loop + ' loops'"></span>
+            </template>
+        </div>
+
+        <button
+            class="master-btn"
+            @click="master_line()"
+            x-show="current_line && !current_line.is_mastered"
+        >&#10003; Mastered</button>
+
+        <button
+            class="master-btn"
+            disabled
+            style="opacity: 0.5; cursor: default;"
+            x-show="current_line && current_line.is_mastered"
+        >&#10003; Already Mastered</button>
+
+        <button class="pause-btn" @click="toggle_pause()">
+            <span x-text="is_paused ? '\u25B6 Resume' : '\u23F8 Pause'"></span>
+        </button>
+    </div>
+
+    <!-- ===== SLIDE-UP CARD: STACK MODE ===== -->
+    <div
+        class="card-overlay"
+        :class="{ hidden: !show_stack_card }"
+        @click="close_stack()"
+    ></div>
+
+    <div
+        class="slide-card"
+        :class="show_stack_card ? 'open' : 'closed'"
+        @touchstart="handle_touch_start($event)"
+        @touchmove.prevent="handle_touch_move($event)"
+        @touchend="handle_touch_end($event)"
+    >
+        <div class="card-handle"></div>
+
+        <div class="card-song-title" x-text="song.title"></div>
+        <div class="card-loop-counter" x-text="'\uD83D\uDD01 Stack Loop ' + stack_loop"></div>
+
+        <!-- Stacked lines: past dimmed, current large, future dimmed -->
+        <div class="stack-lines">
+            <template x-for="line in stack_lines" :key="line.id">
+                <div>
+                    <div
+                        class="stack-line"
+                        :class="{
+                            current: line.id === stack_current_id,
+                            past: line.line_number < stack_current_number
+                        }"
+                        x-text="line.original_text"
+                    ></div>
+                    <!-- Translation for the currently-playing line only -->
+                    <div
+                        class="card-translation stack-translation"
+                        x-show="line.id === stack_current_id"
+                        :class="{ hidden: translation_hidden }"
+                        @click="translation_hidden = !translation_hidden"
+                        x-text="line.translation || 'Translation pending...'"
+                    ></div>
+                </div>
+            </template>
+        </div>
+
+        <button class="pause-btn" @click="toggle_stack_pause()">
+            <span x-text="stack_paused ? '\u25B6 Resume Stack' : '\u23F8 Pause Stack'"></span>
+        </button>
+    </div>
+
+    <!-- ===== LOADING STATE ===== -->
+    <div class="empty-state" x-show="loading">
+        <p>Loading song&hellip;</p>
+    </div>
+</div>
+
+<script>
+/*
+    songPage(song_id) — Alpine.js component for the main learning screen.
+    Self-contained: checklist, slide-up card (line + stack modes),
+    audio engine, touch gestures, and mastery management.
+*/
+function songPage(song_id) {
+    return {
+        /* -- Core data ---------------------------------------- */
+        song_id: song_id,
+        song: {},
+        lines: [],
+        loading: true,
+
+        /* -- Line card state ---------------------------------- */
+        show_line_card: false,
+        current_line: null,
+        active_line_id: null,
+        translation_hidden: false,
+        current_loop: 0,
+        max_dots: 10,
+        is_paused: false,
+        just_mastered_id: null,
+
+        /* -- Stack card state --------------------------------- */
+        show_stack_card: false,
+        stack_lines: [],
+        stack_current_id: null,
+        stack_current_number: 1,
+        stack_loop: 0,
+        stack_paused: false,
+
+        /* -- Audio engine ------------------------------------- */
+        audio: null,           // reusable HTMLAudioElement
+        loop_interval: null,   // setInterval id for 50ms polling
+
+        /* -- Touch gesture ------------------------------------ */
+        touch_start_y: 0,
+        touch_delta_y: 0,
+        is_swiping: false,
+
+        /* -- Computed ----------------------------------------- */
+        get mastered_count() {
+            return this.lines.filter(l => l.is_mastered).length;
+        },
+
+        /* -- Init --------------------------------------------- */
+        async load_song() {
+            try {
+                const res = await fetch('/api/songs/' + this.song_id);
+                if (res.ok) {
+                    const data = await res.json();
+                    this.song = data;
+                    this.lines = data.lines || [];
+                }
+            } catch (err) {
+                console.error('Failed to load song:', err);
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        /* -- Stack helpers ------------------------------------ */
+
+        stack_range() {
+            const total = this.lines.length;
+            if (total < 2) return [];
+            const range = [];
+            for (let i = 2; i <= total; i++) range.push(i);
+            return range;
+        },
+
+        stack_available(n) {
+            const sorted = [...this.lines].sort(
+                (a, b) => a.line_number - b.line_number
+            );
+            for (let i = 0; i < n; i++) {
+                if (!sorted[i] || !sorted[i].is_mastered) return false;
+            }
+            return true;
+        },
+
+        /* ===== LINE CARD ACTIONS ============================= */
+
+        open_line_card(line) {
+            this.current_line = line;
+            this.active_line_id = line.id;
+            this.translation_hidden = false;
+            this.current_loop = 0;
+            this.is_paused = false;
+            this.show_line_card = true;
+
+            // Lock background scroll while card is open
+            document.body.style.overflow = 'hidden';
+
+            // Start the audio loop
+            this.start_line_loop(line);
+        },
+
+        close_card() {
+            this.show_line_card = false;
+            this.active_line_id = null;
+            this.stop_audio();
+            document.body.style.overflow = '';
+        },
+
+        async master_line() {
+            if (!this.current_line) return;
+
+            try {
+                const res = await fetch(
+                    '/api/lyrics/' + this.current_line.id + '/master',
+                    { method: 'PUT' }
+                );
+
+                if (res.ok) {
+                    this.current_line.is_mastered = true;
+                    this.just_mastered_id = this.current_line.id;
+
+                    setTimeout(() => { this.just_mastered_id = null; }, 700);
+                    setTimeout(() => { this.close_card(); }, 400);
+                }
+            } catch (err) {
+                console.error('Failed to master line:', err);
+            }
+        },
+
+        toggle_pause() {
+            this.is_paused = !this.is_paused;
+            if (!this.audio) return;
+
+            if (this.is_paused) {
+                this.audio.pause();
+            } else {
+                this.audio.play();
+            }
+        },
+
+        /* ===== STACK CARD ACTIONS ============================ */
+
+        open_stack(start, end) {
+            this.stack_lines = [...this.lines]
+                .filter(l => l.line_number >= start && l.line_number <= end)
+                .sort((a, b) => a.line_number - b.line_number);
+
+            if (this.stack_lines.length === 0) return;
+
+            this.stack_current_id = this.stack_lines[0].id;
+            this.stack_current_number = this.stack_lines[0].line_number;
+            this.stack_loop = 1;
+            this.stack_paused = false;
+            this.translation_hidden = false;
+            this.show_stack_card = true;
+
+            document.body.style.overflow = 'hidden';
+            this.start_stack_loop(this.stack_lines);
+        },
+
+        close_stack() {
+            this.show_stack_card = false;
+            this.stop_audio();
+            document.body.style.overflow = '';
+        },
+
+        toggle_stack_pause() {
+            this.stack_paused = !this.stack_paused;
+            if (!this.audio) return;
+
+            if (this.stack_paused) {
+                this.audio.pause();
+            } else {
+                this.audio.play();
+            }
+        },
+
+        /* ===== AUDIO ENGINE ================================== */
+
+        /*
+            Single-line loop: seek to start, poll 50ms, pause at end,
+            ~1s gap (SPECS.md D), re-seek, play again.
+        */
+        start_line_loop(line) {
+            this.stop_audio();
+
+            if (!this.song || !this.song.audio_file_path) return;
+            if (line.start_time_ms == null || line.end_time_ms == null) return;
+
+            if (!this.audio) this.audio = new Audio();
+            this.audio.src = '/' + this.song.audio_file_path;
+
+            const start_sec = line.start_time_ms / 1000;
+            const end_sec = line.end_time_ms / 1000;
+
+            this.audio.currentTime = start_sec;
+            this.audio.play().catch(err => console.warn('Autoplay blocked:', err));
+
+            this.loop_interval = setInterval(() => {
+                if (this.is_paused) return;
+
+                if (this.audio.currentTime >= end_sec) {
+                    this.audio.pause();
+                    this.current_loop++;
+
+                    // Fire-and-forget: persist loop count
+                    fetch('/api/lyrics/' + line.id + '/loop', { method: 'PUT' });
+
+                    // ~1 second gap between loops
+                    setTimeout(() => {
+                        if (!this.show_line_card || this.is_paused) return;
+                        this.audio.currentTime = start_sec;
+                        this.audio.play().catch(() => {});
+                    }, 1000);
+                }
+            }, 50);
+        },
+
+        /*
+            Stack loop: continuous audio from first line start to last line end.
+            Updates current-line highlight via 50ms polling. Auto-loops.
+        */
+        start_stack_loop(lines) {
+            this.stop_audio();
+
+            if (!this.song || !this.song.audio_file_path) return;
+            if (lines.length === 0) return;
+
+            const first_line = lines[0];
+            const last_line = lines[lines.length - 1];
+            if (first_line.start_time_ms == null || last_line.end_time_ms == null) return;
+
+            if (!this.audio) this.audio = new Audio();
+            this.audio.src = '/' + this.song.audio_file_path;
+
+            const start_sec = first_line.start_time_ms / 1000;
+            const end_sec = last_line.end_time_ms / 1000;
+
+            this.audio.currentTime = start_sec;
+            this.audio.play().catch(err => console.warn('Autoplay blocked:', err));
+
+            this.loop_interval = setInterval(() => {
+                if (this.stack_paused) return;
+
+                const current_ms = this.audio.currentTime * 1000;
+                this.update_current_stack_line(current_ms, lines);
+
+                if (this.audio.currentTime >= end_sec) {
+                    this.audio.pause();
+                    this.stack_loop++;
+
+                    setTimeout(() => {
+                        if (!this.show_stack_card || this.stack_paused) return;
+                        this.audio.currentTime = start_sec;
+                        this.stack_current_id = lines[0].id;
+                        this.stack_current_number = lines[0].line_number;
+                        this.audio.play().catch(() => {});
+                    }, 1000);
+                }
+            }, 50);
+        },
+
+        stop_audio() {
+            if (this.audio) this.audio.pause();
+            if (this.loop_interval) {
+                clearInterval(this.loop_interval);
+                this.loop_interval = null;
+            }
+        },
+
+        /* Walk backward: last line whose start <= current wins */
+        update_current_stack_line(current_ms, lines) {
+            for (let i = lines.length - 1; i >= 0; i--) {
+                if (current_ms >= lines[i].start_time_ms) {
+                    this.stack_current_id = lines[i].id;
+                    this.stack_current_number = lines[i].line_number;
+                    return;
+                }
+            }
+            this.stack_current_id = lines[0].id;
+            this.stack_current_number = lines[0].line_number;
+        },
+
+        /* ===== TOUCH SWIPE-DOWN GESTURE ====================== */
+
+        handle_touch_start(event) {
+            this.touch_start_y = event.touches[0].clientY;
+            this.touch_delta_y = 0;
+            this.is_swiping = true;
+        },
+
+        handle_touch_move(event) {
+            if (!this.is_swiping) return;
+            const current_y = event.touches[0].clientY;
+            this.touch_delta_y = current_y - this.touch_start_y;
+
+            // Only allow downward swipe
+            if (this.touch_delta_y < 0) {
+                this.touch_delta_y = 0;
+                return;
+            }
+
+            // Visual feedback: card follows the finger
+            event.currentTarget.style.transform =
+                'translateY(' + this.touch_delta_y + 'px)';
+        },
+
+        handle_touch_end(event) {
+            if (!this.is_swiping) return;
+            this.is_swiping = false;
+
+            const card = event.currentTarget;
+
+            if (this.touch_delta_y > 100) {
+                // Dragged far enough — dismiss
+                if (this.show_line_card) this.close_card();
+                else if (this.show_stack_card) this.close_stack();
+            }
+
+            // Reset transform (snap back or let CSS handle close)
+            card.style.transform = '';
+            this.touch_delta_y = 0;
+        },
+    };
+}
+</script>
+{% endblock %}

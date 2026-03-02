@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}My Songs — LyricFlow{% endblock %}
+
+{% block content %}
+<!--
+    Song Library screen.
+    Alpine.js fetches the song list from the API and renders cards.
+    Language tabs filter client-side so there's no extra network call.
+-->
+<div x-data="library()" x-init="load_songs()">
+
+    <!-- Header -->
+    <header class="library-header">
+        <h1>My Songs</h1>
+        <a href="/songs/new" aria-label="Add a new song">
+            <button class="add-btn" type="button">+</button>
+        </a>
+    </header>
+
+    <!-- Language filter tabs — built dynamically from your songs -->
+    <nav class="language-tabs" aria-label="Filter by language" x-show="songs.length > 0">
+        <button
+            class="language-tab"
+            :class="{ active: active_tab === 'all' }"
+            @click="active_tab = 'all'"
+        >All</button>
+        <template x-for="lang in unique_languages" :key="lang">
+            <button
+                class="language-tab"
+                :class="{ active: active_tab === lang }"
+                @click="active_tab = lang"
+                x-text="lang.charAt(0).toUpperCase() + lang.slice(1)"
+            ></button>
+        </template>
+    </nav>
+
+    <!-- Song list -->
+    <div class="song-list" x-show="filtered_songs().length > 0">
+        <template x-for="song in filtered_songs()" :key="song.id">
+            <a :href="'/song/' + song.id" class="card-link">
+                <article class="song-card">
+                    <!-- Album art emoji -->
+                    <div class="song-art">
+                        <span x-text="language_emoji(song.language)"></span>
+                    </div>
+
+                    <!-- Song info -->
+                    <div class="song-info">
+                        <div class="song-title" x-text="song.title"></div>
+                        <div class="song-artist" x-text="song.artist"></div>
+                        <div class="song-meta">
+                            <span class="language-badge" x-text="song.language"></span>
+                            <span class="line-count" x-text="song.line_count + ' lines'"></span>
+                        </div>
+                    </div>
+
+                    <!-- Progress -->
+                    <div class="song-progress">
+                        <span class="progress-label" x-text="song.mastered_count + '/' + song.line_count"></span>
+                        <div class="progress-bar">
+                            <div
+                                class="progress-fill"
+                                :style="'width: ' + progress_pct(song) + '%'"
+                            ></div>
+                        </div>
+                    </div>
+                </article>
+            </a>
+        </template>
+    </div>
+
+    <!-- Empty state -->
+    <div class="empty-state" x-show="filtered_songs().length === 0 && !loading">
+        <p>No songs yet.</p>
+        <p>Tap <strong>+</strong> to start learning.</p>
+    </div>
+
+    <!-- Loading indicator -->
+    <div class="empty-state" x-show="loading">
+        <p>Loading songs&hellip;</p>
+    </div>
+</div>
+
+<script>
+/*
+    library() — Alpine.js component for the Song Library screen.
+    Fetches songs from the API, filters by language tab.
+*/
+function library() {
+    return {
+        songs: [],
+        active_tab: 'all',
+        loading: true,
+
+        async load_songs() {
+            try {
+                const res = await fetch('/api/songs');
+                if (res.ok) {
+                    this.songs = await res.json();
+                }
+            } catch (err) {
+                console.error('Failed to load songs:', err);
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        /* Distinct languages from the user's songs, sorted alphabetically */
+        get unique_languages() {
+            const langs = [...new Set(this.songs.map(s => s.language))];
+            return langs.sort();
+        },
+
+        /* Return songs matching the active language tab */
+        filtered_songs() {
+            if (this.active_tab === 'all') return this.songs;
+            return this.songs.filter(s => s.language === this.active_tab);
+        },
+
+        /* Mastery percentage for the progress bar width */
+        progress_pct(song) {
+            if (!song.line_count || song.line_count === 0) return 0;
+            return Math.round((song.mastered_count / song.line_count) * 100);
+        },
+
+        /* Map language name to an emoji for the art square */
+        language_emoji(lang) {
+            const map = {
+                spanish: '\uD83C\uDDEA\uD83C\uDDF8',
+                portuguese: '\uD83C\uDDE7\uD83C\uDDF7',
+                french: '\uD83C\uDDEB\uD83C\uDDF7',
+                italian: '\uD83C\uDDEE\uD83C\uDDF9',
+                german: '\uD83C\uDDE9\uD83C\uDDEA',
+            };
+            return map[lang] || '\uD83C\uDFB5';
+        }
+    };
+}
+</script>
+{% endblock %}

@@ -1,0 +1,819 @@
+{% extends "base.html" %}
+
+{% block title %}Add Song — LyricFlow{% endblock %}
+
+{% block content %}
+<!--
+    Add Song screen — four-step form.
+    Step 1: Song info + MP3 upload.
+    Step 2: Paste and edit lyrics.
+    Step 3: AI-generated translations (review & edit).
+    Step 4: Auto-timestamps via Whisper (review & adjust).
+    Alpine.js manages step visibility and all API calls.
+-->
+<div x-data="addSong()">
+
+    <!-- Header with back arrow -->
+    <header class="add-header">
+        <a href="/" class="back-btn" aria-label="Back to library">
+            &#8592;
+        </a>
+        <h1>Add Song</h1>
+    </header>
+
+    <!-- Step indicator -->
+    <div class="step-indicator">
+        <span x-text="'Step ' + step + ' of 4'"></span>
+        <div style="display:flex; gap:6px; justify-content:center; margin-top:6px;">
+            <span
+                style="width:8px; height:8px; border-radius:50%; display:inline-block;"
+                :style="step >= 1 ? 'background:var(--accent, #8b2252)' : 'background:#333'"
+            ></span>
+            <span
+                style="width:8px; height:8px; border-radius:50%; display:inline-block;"
+                :style="step >= 2 ? 'background:var(--accent, #8b2252)' : 'background:#333'"
+            ></span>
+            <span
+                style="width:8px; height:8px; border-radius:50%; display:inline-block;"
+                :style="step >= 3 ? 'background:var(--accent, #8b2252)' : 'background:#333'"
+            ></span>
+            <span
+                style="width:8px; height:8px; border-radius:50%; display:inline-block;"
+                :style="step >= 4 ? 'background:var(--accent, #8b2252)' : 'background:#333'"
+            ></span>
+        </div>
+    </div>
+
+    <!-- ===== STEP 1 — Info + Upload ===== -->
+    <div x-show="step === 1">
+
+        <!-- Title -->
+        <div class="form-group">
+            <label class="form-label" for="song-title">Title</label>
+            <input
+                id="song-title"
+                type="text"
+                class="form-input"
+                placeholder="Song title"
+                x-model="title"
+            >
+        </div>
+
+        <!-- Artist -->
+        <div class="form-group">
+            <label class="form-label" for="song-artist">Artist</label>
+            <input
+                id="song-artist"
+                type="text"
+                class="form-input"
+                placeholder="Artist name"
+                x-model="artist"
+            >
+        </div>
+
+        <!-- Language -->
+        <div class="form-group">
+            <label class="form-label" for="song-language">Language</label>
+            <select
+                id="song-language"
+                class="form-select"
+                x-model="language"
+            >
+                <option value="spanish">Spanish</option>
+                <option value="portuguese">Portuguese</option>
+                <option value="french">French</option>
+                <option value="italian">Italian</option>
+                <option value="german">German</option>
+                <option value="japanese">Japanese</option>
+                <option value="korean">Korean</option>
+            </select>
+        </div>
+
+        <!-- MP3 Upload -->
+        <div class="form-group">
+            <label class="form-label">MP3 File</label>
+
+            <!-- Drag-and-drop zone -->
+            <div
+                class="upload-zone"
+                :class="{ 'has-file': uploaded }"
+                @click="$refs.file_input.click()"
+                @dragover.prevent
+                @drop.prevent="handle_drop($event)"
+            >
+                <!-- Before file is selected -->
+                <template x-if="!file">
+                    <span>Drop MP3 here or tap to browse</span>
+                </template>
+
+                <!-- Uploading state -->
+                <template x-if="file && uploading">
+                    <span>Uploading...</span>
+                </template>
+
+                <!-- Upload complete -->
+                <template x-if="file && uploaded">
+                    <div class="upload-info">
+                        <span>&#127925;</span>
+                        <span x-text="file_name"></span>
+                        <span x-text="file_size"></span>
+                        <span>Uploaded &#10003;</span>
+                    </div>
+                </template>
+
+                <!-- File selected but upload failed / not yet started -->
+                <template x-if="file && !uploading && !uploaded">
+                    <div class="upload-info">
+                        <span>&#127925;</span>
+                        <span x-text="file_name"></span>
+                        <span x-text="file_size"></span>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Hidden file input -->
+            <input
+                type="file"
+                accept=".mp3,audio/*"
+                x-ref="file_input"
+                @change="handle_file($event)"
+                style="display:none;"
+            >
+        </div>
+
+        <!-- Next button -->
+        <button
+            class="btn-primary"
+            :disabled="!step1_valid || creating"
+            @click="next_step()"
+            x-text="creating ? 'Creating...' : 'Next'"
+        ></button>
+    </div>
+
+    <!-- ===== STEP 2 — Paste Lyrics ===== -->
+    <div x-show="step === 2">
+
+        <!-- Lyrics textarea -->
+        <div class="form-group">
+            <label class="form-label" for="lyrics-input">Paste Lyrics</label>
+            <textarea
+                id="lyrics-input"
+                class="lyrics-textarea"
+                placeholder="Paste lyrics here, one line per line..."
+                x-model="lyrics_text"
+            ></textarea>
+        </div>
+
+        <!-- Line count -->
+        <div class="line-count-label" x-show="parsed_lines.length > 0">
+            <span x-text="parsed_lines.length + ' lines detected'"></span>
+        </div>
+
+        <!-- Preview of parsed lines -->
+        <div class="lyrics-preview" x-show="parsed_lines.length > 0">
+            <template x-for="(line, index) in parsed_lines" :key="index">
+                <div class="preview-line">
+                    <span class="preview-number" x-text="index + 1"></span>
+                    <span class="preview-text" x-text="line"></span>
+                    <button
+                        class="preview-delete"
+                        @click="remove_line(index)"
+                        aria-label="Remove line"
+                    >&times;</button>
+                </div>
+            </template>
+        </div>
+
+        <!-- Save Lyrics button -->
+        <button
+            class="btn-primary"
+            :disabled="parsed_lines.length === 0 || saving"
+            @click="save_lyrics()"
+            x-text="saving ? 'Saving...' : 'Save Lyrics'"
+        ></button>
+    </div>
+
+    <!-- ===== STEP 3 — AI Translation ===== -->
+    <div x-show="step === 3">
+
+        <div class="translation-header">
+            <h2>Translations</h2>
+            <p>AI-generated English translations</p>
+        </div>
+
+        <!-- Translating spinner state -->
+        <div class="translating-spinner" x-show="translating">
+            <div style="margin-bottom:0.75rem;">
+                <span class="spinner-dot"></span>
+                <span class="spinner-dot"></span>
+                <span class="spinner-dot"></span>
+            </div>
+            <span>Translating...</span>
+        </div>
+
+        <!-- Side-by-side line list (shown after translation completes) -->
+        <div x-show="!translating && translated_lines.length > 0">
+            <div class="translation-list">
+                <template x-for="(line, index) in translated_lines" :key="line.id">
+                    <div class="translation-row">
+                        <span class="translation-number" x-text="line.line_number"></span>
+                        <div class="translation-original" x-text="line.original_text"></div>
+                        <!-- Display mode: tap to edit -->
+                        <div
+                            class="translation-translated"
+                            x-show="!line.editing"
+                            @click="edit_translation(index)"
+                            x-text="line.translation"
+                        ></div>
+                        <!-- Edit mode: input field -->
+                        <div class="translation-translated" x-show="line.editing" style="padding:0.3rem;">
+                            <input
+                                type="text"
+                                class="translation-edit-input"
+                                :id="'edit-translation-' + index"
+                                x-model="line.translation"
+                                @blur="save_translation(index)"
+                                @keydown.enter="save_translation(index)"
+                            >
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Approve All & Continue button -->
+            <button
+                class="btn-primary"
+                :disabled="translating"
+                @click="approve_translations()"
+            >Approve All &amp; Continue</button>
+        </div>
+
+    </div>
+
+    <!-- ===== STEP 4 — Tap-to-Sync Timestamps ===== -->
+    <div x-show="step === 4">
+
+        <!-- ── TAP PHASE ─────────────────────────────── -->
+        <div x-show="sync_phase === 'tap'" class="sync-container">
+
+            <div class="sync-header">
+                <h2>Tap to Sync</h2>
+                <p>Tap <strong>Mark</strong> when each line starts in the song</p>
+            </div>
+
+            <!-- Progress counter -->
+            <div class="sync-progress">
+                <span x-text="sync_marks.filter(m => m.start_time_ms !== null).length + ' / ' + sync_marks.length + ' lines synced'"></span>
+            </div>
+
+            <!-- Play / Pause controls -->
+            <div class="sync-controls">
+                <button
+                    class="btn-secondary sync-play-btn"
+                    @click="sync_playing ? pause_sync() : play_sync()"
+                    x-text="sync_playing ? '⏸ Pause' : '▶ Play'"
+                ></button>
+                <span class="sync-time" x-text="audio ? format_time(Math.round(audio.currentTime * 1000)) : '0:00.0'"></span>
+            </div>
+
+            <!-- Scrollable lyrics list -->
+            <div class="sync-lyrics" x-ref="sync_lyrics_list">
+                <template x-for="(mark, index) in sync_marks" :key="index">
+                    <div
+                        class="sync-line"
+                        :class="{
+                            'past': mark.start_time_ms !== null && index < sync_current_index,
+                            'active': index === sync_current_index,
+                            'future': index > sync_current_index && mark.start_time_ms === null
+                        }"
+                        x-init="index === sync_current_index && $nextTick(() => $el.scrollIntoView({block: 'center', behavior: 'smooth'}))"
+                        x-effect="index === sync_current_index && $el.scrollIntoView({block: 'center', behavior: 'smooth'})"
+                    >
+                        <span class="sync-line-number" x-text="index + 1"></span>
+                        <span class="sync-line-text" x-text="mark.original_text"></span>
+                        <span class="sync-line-check" x-show="mark.start_time_ms !== null">&#10003;</span>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Big MARK button -->
+            <button
+                class="sync-mark-btn"
+                @click="tap_mark()"
+                :disabled="!sync_playing"
+            >Mark</button>
+
+            <!-- Skip and Done row -->
+            <div class="sync-bottom-row">
+                <button class="btn-secondary sync-skip-btn" @click="skip_line()" :disabled="!sync_playing">Skip</button>
+                <button class="btn-secondary sync-done-btn" @click="finish_first_pass()">Done</button>
+            </div>
+        </div>
+
+        <!-- ── REVIEW PHASE ──────────────────────────── -->
+        <div x-show="sync_phase === 'review'">
+
+            <!-- Summary -->
+            <div class="timestamp-summary">
+                <span class="match-count" x-text="sync_marks.filter(m => m.start_time_ms !== null).length + '/' + sync_marks.length + ' lines synced'"></span>
+            </div>
+
+            <!-- Timestamp line list (reuses existing CSS) -->
+            <div class="timestamp-list">
+                <template x-for="(line, index) in timestamp_lines" :key="index">
+                    <div class="timestamp-row" :class="{'sync-unset': line.start_time_ms == null}">
+                        <span class="timestamp-row-number" x-text="line.line_number"></span>
+                        <span class="timestamp-row-text" x-text="line.original_text"></span>
+
+                        <!-- Time display -->
+                        <span
+                            class="timestamp-row-time"
+                            @click="toggle_adjust(index)"
+                            x-text="format_time(line.start_time_ms) + ' → ' + format_time(line.end_time_ms)"
+                        ></span>
+
+                        <!-- Re-tap button -->
+                        <button class="retap-btn" @click="retap_line(index)">Re-tap</button>
+
+                        <!-- Play segment button (only if timestamped) -->
+                        <button
+                            class="play-segment-btn"
+                            @click="play_segment(line)"
+                            x-show="line.start_time_ms != null"
+                            aria-label="Play segment"
+                        >&#9654;</button>
+
+                        <!-- Adjust controls -->
+                        <div class="adjust-controls" x-show="line.adjusting">
+                            <span class="adjust-label">Start</span>
+                            <button class="adjust-btn" @click="adjust_time(index, 'start_time_ms', -100)">-100ms</button>
+                            <button class="adjust-btn" @click="adjust_time(index, 'start_time_ms', 100)">+100ms</button>
+                            <span class="adjust-label">End</span>
+                            <button class="adjust-btn" @click="adjust_time(index, 'end_time_ms', -100)">-100ms</button>
+                            <button class="adjust-btn" @click="adjust_time(index, 'end_time_ms', 100)">+100ms</button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Confirm & Finish -->
+            <button
+                class="btn-primary"
+                @click="confirm_timestamps()"
+            >Confirm &amp; Finish</button>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+/*
+    addSong() — Alpine.js component for the four-step Add Song form.
+    Step 1: collect song info + upload MP3.
+    Step 2: paste lyrics, preview lines, save to API.
+    Step 3: AI translation — review & edit translations.
+    Step 4: auto-timestamps — review, adjust, confirm.
+*/
+function addSong() {
+    return {
+        step: 1,
+
+        /* -- Step 1 state ---------------------------------- */
+        title: '',
+        artist: '',
+        language: 'spanish',
+        file: null,
+        file_name: '',
+        file_size: '',
+        file_path: '',   // returned from the upload API
+        uploading: false,
+        uploaded: false,
+        song_id: null,
+        creating: false,
+
+        /* -- Step 2 state ---------------------------------- */
+        lyrics_text: '',
+        lines: [],
+        saving: false,
+
+        /* -- Step 3 state (Translation) -------------------- */
+        translated_lines: [],      // [{id, line_number, original_text, translation, editing: false}]
+        translating: false,
+
+        /* -- Step 4 state (Tap-to-Sync) -------------------- */
+        sync_phase: 'tap',         // 'tap' (first pass) or 'review' (fix & adjust)
+        sync_current_index: 0,     // line waiting for tap
+        sync_playing: false,       // is audio currently playing
+        sync_marks: [],            // [{line_id, line_number, original_text, start_time_ms, end_time_ms}]
+        retap_index: null,         // when re-tapping a single line from review
+        audio: null,               // HTML5 Audio element for playback
+        timestamp_lines: [],       // reused in review phase for adjust/preview
+        timestamp_summary: null,
+
+        /* -- Computed -------------------------------------- */
+
+        /* Step 1 is valid when all fields are filled and file is uploaded */
+        get step1_valid() {
+            return this.title.trim() && this.artist.trim() && this.language && this.uploaded;
+        },
+
+        get line_count() {
+            return this.parsed_lines.length;
+        },
+
+        /* Split textarea into non-empty trimmed lines */
+        get parsed_lines() {
+            return this.lyrics_text.split('\n')
+                .map(l => l.trim())
+                .filter(l => l.length > 0);
+        },
+
+        /* -- Methods --------------------------------------- */
+
+        /* Handle file selected via the file input */
+        async handle_file(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            await this.upload_file(file);
+        },
+
+        /* Handle file dropped onto the upload zone */
+        async handle_drop(event) {
+            const file = event.dataTransfer.files[0];
+            if (!file) return;
+            await this.upload_file(file);
+        },
+
+        /* Upload the MP3 file to the server */
+        async upload_file(file) {
+            this.file = file;
+            this.file_name = file.name;
+            this.file_size = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
+            this.uploading = true;
+
+            const form = new FormData();
+            form.append('file', file);
+
+            try {
+                const res = await fetch('/api/upload/mp3', {
+                    method: 'POST',
+                    body: form,
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    alert(err.detail || 'Upload failed');
+                    this.uploading = false;
+                    return;
+                }
+                const data = await res.json();
+                this.file_path = data.file_path;
+                this.uploaded = true;
+            } catch (e) {
+                alert('Upload failed: ' + e.message);
+            } finally {
+                this.uploading = false;
+            }
+        },
+
+        /* Create the song record and advance to Step 2 */
+        async next_step() {
+            if (!this.step1_valid || this.creating) return;
+            this.creating = true;
+
+            try {
+                const res = await fetch('/api/songs/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: this.title,
+                        artist: this.artist,
+                        language: this.language,
+                        source_type: 'mp3',
+                        audio_file_path: this.file_path,
+                    }),
+                });
+                if (!res.ok) throw new Error('Failed to create song');
+                const song = await res.json();
+                this.song_id = song.id;
+                this.step = 2;
+            } catch (e) {
+                alert('Error: ' + e.message);
+            } finally {
+                this.creating = false;
+            }
+        },
+
+        /* Remove a line from the lyrics by index and rebuild the text */
+        remove_line(index) {
+            const arr = this.parsed_lines;
+            arr.splice(index, 1);
+            this.lyrics_text = arr.join('\n');
+        },
+
+        /* Save all parsed lines to the API, then advance to Step 3 (Translation) */
+        async save_lyrics() {
+            if (this.parsed_lines.length === 0 || this.saving) return;
+            this.saving = true;
+
+            const lines = this.parsed_lines.map((text, i) => ({
+                line_number: i + 1,
+                original_text: text,
+            }));
+
+            try {
+                const res = await fetch('/api/lyrics/songs/' + this.song_id + '/lines', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ lines: lines }),
+                });
+                if (!res.ok) throw new Error('Failed to save lyrics');
+                // Advance to translation step instead of redirecting
+                this.step = 3;
+                this.start_translation();
+            } catch (e) {
+                alert('Error: ' + e.message);
+            } finally {
+                this.saving = false;
+            }
+        },
+
+        /* -- Step 3 methods -------------------------------- */
+
+        /* Trigger AI translation after lyrics are saved */
+        async start_translation() {
+            this.translating = true;
+            try {
+                const res = await fetch('/api/songs/' + this.song_id + '/translate', { method: 'POST' });
+                if (!res.ok) throw new Error('Translation failed');
+                const lines = await res.json();
+                this.translated_lines = lines.map(l => ({...l, editing: false}));
+            } catch (e) {
+                alert('Translation error: ' + e.message);
+            } finally {
+                this.translating = false;
+            }
+        },
+
+        /* Toggle inline editing for a translation */
+        edit_translation(index) {
+            this.translated_lines[index].editing = true;
+            // Focus the input after Alpine re-renders
+            this.$nextTick(() => {
+                const input = document.getElementById('edit-translation-' + index);
+                if (input) input.focus();
+            });
+        },
+
+        /* Save an edited translation */
+        async save_translation(index) {
+            const line = this.translated_lines[index];
+            line.editing = false;
+            // Persist to API
+            await fetch('/api/lyrics/' + line.id, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({translation: line.translation})
+            });
+        },
+
+        /* Approve all translations and advance to Step 4 */
+        async approve_translations() {
+            // Single bulk request instead of N individual calls
+            const res = await fetch(
+                '/api/songs/' + this.song_id + '/approve-translations',
+                { method: 'PUT' }
+            );
+            if (!res.ok) {
+                alert('Failed to approve translations');
+                return;
+            }
+            this.step = 4;
+            this.start_sync();
+        },
+
+        /* -- Step 4 methods (Tap-to-Sync) ----------------- */
+
+        /* Initialize tap-to-sync: build marks array, create audio */
+        start_sync() {
+            this.sync_marks = this.translated_lines.map(l => ({
+                line_id: l.id,
+                line_number: l.line_number,
+                original_text: l.original_text,
+                start_time_ms: null,
+                end_time_ms: null,
+            }));
+            this.sync_phase = 'tap';
+            this.sync_current_index = 0;
+            this.retap_index = null;
+
+            if (!this.audio) this.audio = new Audio();
+            this.audio.src = '/' + (this.file_path || '');
+            this.sync_playing = false;
+        },
+
+        /* Start or resume audio playback */
+        play_sync() {
+            if (!this.audio) return;
+            this.audio.play().catch(err => console.warn('Autoplay blocked:', err));
+            this.sync_playing = true;
+            // Update displayed time via polling
+            this._sync_time_interval = setInterval(() => {
+                // Trigger Alpine reactivity by reading currentTime
+                this.sync_playing = !this.audio.paused;
+            }, 200);
+        },
+
+        /* Pause audio */
+        pause_sync() {
+            if (this.audio) this.audio.pause();
+            this.sync_playing = false;
+            if (this._sync_time_interval) {
+                clearInterval(this._sync_time_interval);
+                this._sync_time_interval = null;
+            }
+        },
+
+        /* Core action: record current audio time for the active line */
+        tap_mark() {
+            if (!this.audio || !this.sync_playing) return;
+
+            const now_ms = Math.round(this.audio.currentTime * 1000);
+            const idx = this.retap_index !== null ? this.retap_index : this.sync_current_index;
+
+            // Record this line's start time
+            this.sync_marks[idx].start_time_ms = now_ms;
+
+            // Set previous line's end time = this line's start
+            if (idx > 0 && this.sync_marks[idx - 1].start_time_ms !== null) {
+                this.sync_marks[idx - 1].end_time_ms = now_ms;
+            }
+
+            // If re-tapping a single line from review, go back to review
+            if (this.retap_index !== null) {
+                this.retap_index = null;
+                this.pause_sync();
+                this._compute_end_times();
+                this._build_review_lines();
+                this.sync_phase = 'review';
+                return;
+            }
+
+            // Advance to next line
+            if (this.sync_current_index < this.sync_marks.length - 1) {
+                this.sync_current_index++;
+            } else {
+                // All lines tapped — auto-finish
+                this.finish_first_pass();
+            }
+        },
+
+        /* Skip current line without marking */
+        skip_line() {
+            if (this.sync_current_index < this.sync_marks.length - 1) {
+                this.sync_current_index++;
+            } else {
+                this.finish_first_pass();
+            }
+        },
+
+        /* Switch from tap phase to review phase */
+        finish_first_pass() {
+            this.pause_sync();
+            this._compute_end_times();
+            this._build_review_lines();
+            this.sync_phase = 'review';
+        },
+
+        /* Compute end times: each line's end = next line's start */
+        _compute_end_times() {
+            for (let i = 0; i < this.sync_marks.length; i++) {
+                const mark = this.sync_marks[i];
+                if (mark.start_time_ms === null) continue;
+
+                // Find next marked line's start
+                let next_start = null;
+                for (let j = i + 1; j < this.sync_marks.length; j++) {
+                    if (this.sync_marks[j].start_time_ms !== null) {
+                        next_start = this.sync_marks[j].start_time_ms;
+                        break;
+                    }
+                }
+
+                if (next_start !== null) {
+                    mark.end_time_ms = next_start;
+                } else if (mark.end_time_ms === null) {
+                    // Last marked line: end = start + 3 seconds
+                    mark.end_time_ms = mark.start_time_ms + 3000;
+                }
+            }
+        },
+
+        /* Build timestamp_lines array for the review UI */
+        _build_review_lines() {
+            this.timestamp_lines = this.sync_marks.map(m => ({
+                line_number: m.line_number,
+                original_text: m.original_text,
+                start_time_ms: m.start_time_ms,
+                end_time_ms: m.end_time_ms,
+                adjusting: false,
+            }));
+        },
+
+        /* Re-tap a specific line from review phase */
+        retap_line(index) {
+            this.retap_index = index;
+            this.sync_current_index = index;
+
+            // Seek audio to 2s before this line's current start (or 0)
+            const start = this.sync_marks[index].start_time_ms;
+            const seek_to = Math.max(0, (start !== null ? start : 0) - 2000);
+            this.audio.currentTime = seek_to / 1000;
+
+            this.sync_phase = 'tap';
+            this.play_sync();
+        },
+
+        /* Format milliseconds as MM:SS.s */
+        format_time(ms) {
+            if (ms == null) return '--:--';
+            const secs = ms / 1000;
+            const m = Math.floor(secs / 60);
+            const s = (secs % 60).toFixed(1);
+            return m + ':' + s.padStart(4, '0');
+        },
+
+        /* Play a specific audio segment for preview */
+        play_segment(line) {
+            if (!this.audio) {
+                this.audio = new Audio();
+            }
+            // Use the uploaded file path
+            this.audio.src = '/' + (this.file_path || '');
+            this.audio.currentTime = (line.start_time_ms || 0) / 1000;
+            this.audio.play();
+            // Stop at end_time_ms
+            const end = (line.end_time_ms || 0) / 1000;
+            const check = () => {
+                if (this.audio.currentTime >= end) {
+                    this.audio.pause();
+                } else {
+                    requestAnimationFrame(check);
+                }
+            };
+            check();
+        },
+
+        /* Adjust a timestamp by delta ms */
+        adjust_time(index, field, delta) {
+            const line = this.timestamp_lines[index];
+            const current = line[field] || 0;
+            line[field] = Math.max(0, current + delta);
+        },
+
+        /* Toggle adjust mode for a timestamp line */
+        toggle_adjust(index) {
+            this.timestamp_lines[index].adjusting = !this.timestamp_lines[index].adjusting;
+        },
+
+        /* Save timestamps and finish */
+        async confirm_timestamps() {
+            // Recompute end times from current sync_marks (may have been adjusted)
+            this._sync_review_to_marks();
+
+            const timestamps = this.sync_marks
+                .filter(m => m.start_time_ms != null && m.end_time_ms != null)
+                .map(m => ({
+                    line_id: m.line_id,
+                    start_time_ms: m.start_time_ms,
+                    end_time_ms: m.end_time_ms,
+                }));
+
+            if (timestamps.length === 0) {
+                alert('No timestamps to save. Tap some lines first.');
+                return;
+            }
+
+            try {
+                await fetch('/api/songs/' + this.song_id + '/timestamps', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({timestamps})
+                });
+                window.location.href = '/song/' + this.song_id;
+            } catch (e) {
+                alert('Error saving timestamps: ' + e.message);
+            }
+        },
+
+        /* Copy adjustments from review UI back to sync_marks */
+        _sync_review_to_marks() {
+            for (let i = 0; i < this.timestamp_lines.length; i++) {
+                this.sync_marks[i].start_time_ms = this.timestamp_lines[i].start_time_ms;
+                this.sync_marks[i].end_time_ms = this.timestamp_lines[i].end_time_ms;
+            }
+        },
+    };
+}
+</script>
+{% endblock %}

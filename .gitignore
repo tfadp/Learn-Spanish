@@ -1,0 +1,24 @@
+# Environment & secrets
+.env
+lyricflow/.env
+
+# Database
+*.db
+
+# Uploaded audio files (user content, not source code)
+lyricflow/static/uploads/*.mp3
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Testing
+.pytest_cache/
+
+# macOS
+.DS_Store
+
+# Large reference files (not source code)
+*.mp3
+!lyricflow/static/uploads/.gitkeep
