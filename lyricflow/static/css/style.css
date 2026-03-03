@@ -30,6 +30,11 @@
     padding: 0;
 }
 
+/* Alpine.js: hide x-cloak elements until Alpine initializes */
+[x-cloak] {
+    display: none !important;
+}
+
 /* -- Base -------------------------------------------------- */
 html {
     /* Prevent iOS tap-highlight flash */
@@ -495,52 +500,8 @@ body {
     margin-bottom: 16px;
 }
 
-/* Line number label above the lyric */
-.card-line-number {
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.4);
-    text-align: center;
-    margin-bottom: 6px;
-}
-
-/* The lyric line — big, bold, centered */
-.card-line-text {
-    font-size: 28px;
-    font-weight: 700;
-    color: #fff;
-    text-align: center;
-    line-height: 1.3;
-    margin-bottom: 8px;
-}
-
-/* Translation row: text + eye toggle side by side */
-.card-translation-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    margin-bottom: 20px;
-}
-
-.translation-toggle-btn {
-    background: none;
-    border: none;
-    font-size: 18px;
-    cursor: pointer;
-    padding: 4px;
-    opacity: 0.5;
-    flex-shrink: 0;
-    /* 44px minimum touch target for mobile */
-    min-width: 44px;
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.translation-toggle-btn:active {
-    opacity: 1;
-}
+/* (Removed: .card-line-number, .card-line-text, .card-translation-row,
+   .translation-toggle-btn — replaced by full-screen line card styles below) */
 
 /* Translation — tap text or eye button to show/hide */
 .card-translation {
@@ -562,61 +523,8 @@ body {
     user-select: none;
 }
 
-/* Loop progress dots (e.g. 5 small circles) */
-/* Loop progress bar — fills and shifts color as you practice */
-.loop-bar-track {
-    width: 100%;
-    height: 8px;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.12);
-    margin-bottom: 16px;
-    overflow: hidden;
-}
-
-.loop-bar-fill {
-    height: 100%;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.8);
-    transition: width 0.4s ease, background 0.4s ease, box-shadow 0.4s ease;
-    width: 0%;
-}
-
-/* Pulse: brief stretch on each new loop */
-.loop-bar-fill.pulse {
-    animation: loop-pulse 0.3s ease;
-}
-
-/* Midway (5+ loops): warm up the color */
-.loop-bar-fill.halfway {
-    background: linear-gradient(90deg, #e8a849, #f0c060);
-}
-
-/* Full (10 loops): gold with glow — you're ready */
-.loop-bar-fill.full {
-    background: linear-gradient(90deg, #f0a030, #ffd700);
-    box-shadow: 0 0 12px rgba(255, 215, 0, 0.5);
-    animation: loop-glow 1.5s ease-in-out infinite alternate;
-}
-
-@keyframes loop-pulse {
-    0% { transform: scaleY(1); }
-    50% { transform: scaleY(1.6); }
-    100% { transform: scaleY(1); }
-}
-
-@keyframes loop-glow {
-    0% { box-shadow: 0 0 8px rgba(255, 215, 0, 0.3); }
-    100% { box-shadow: 0 0 16px rgba(255, 215, 0, 0.6); }
-}
-
-/* Overflow label when loops exceed the bar */
-.loop-bar-label {
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.5);
-    text-align: center;
-    margin-top: -8px;
-    margin-bottom: 12px;
-}
+/* (Removed: .loop-bar-track, .loop-bar-fill, .loop-bar-label —
+   replaced by thin .line-card-progress-track below) */
 
 /* Translation shown inside stack card for current line */
 .stack-translation {
@@ -626,53 +534,8 @@ body {
     padding: 4px 6px;
 }
 
-/* Timing adjustment section in Line Card */
-.card-timing-section {
-    padding-top: 0.25rem;
-}
-
-.timing-toggle-btn {
-    background: rgba(255, 255, 255, 0.15);
-    border: none;
-    border-radius: 8px;
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 0.75rem;
-    cursor: pointer;
-    padding: 0.3rem 0.6rem;
-    opacity: 0.7;
-    /* 44px minimum touch target for mobile */
-    min-height: 44px;
-}
-
-.timing-toggle-btn:active {
-    opacity: 1;
-}
-
-.card-timing-controls {
-    background: rgba(0, 0, 0, 0.25);
-    border-radius: 10px;
-    padding: 0.6rem 0.8rem;
-    margin-top: 0.4rem;
-}
-
-.card-timing-controls .adjust-controls {
-    justify-content: center;
-}
-
-.card-timing-controls .adjust-label {
-    color: rgba(255, 255, 255, 0.7);
-    font-weight: 500;
-}
-
-.card-timing-controls .adjust-btn {
-    background: rgba(255, 255, 255, 0.15);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: #fff;
-}
-
-.card-timing-controls .adjust-btn:active {
-    background: rgba(255, 255, 255, 0.3);
-}
+/* (Removed: .card-timing-section, .timing-toggle-btn, .card-timing-controls —
+   timing controls now live in .line-card-gear-panel below) */
 
 .timing-value {
     color: rgba(255, 255, 255, 0.8);
@@ -683,37 +546,8 @@ body {
     font-variant-numeric: tabular-nums;
 }
 
-/* Side-by-side button row inside the card */
-.card-actions {
-    display: flex;
-    gap: 10px;
-}
-
-/* Master button — ghost/outline by default (not yet mastered) */
-.master-btn {
-    flex: 1;
-    padding: 14px;
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 14px;
-    font-weight: 500;
-    border: none;
-    cursor: pointer;
-    min-height: 48px;
-    transition: background 0.2s ease, color 0.2s ease;
-}
-
-/* When mastered — solid white with accent text */
-.master-btn.mastered {
-    background: #fff;
-    color: var(--accent);
-    font-weight: 700;
-}
-
-.master-btn:active {
-    opacity: 0.85;
-}
+/* (Removed: .card-actions, .master-btn —
+   replaced by .line-card-master-pill in full-screen card below) */
 
 /* Pause button — subtle, translucent white */
 .pause-btn {
@@ -1336,6 +1170,263 @@ a.card-link {
 .manual-mode-link:hover {
     color: var(--text);
 }
+
+/* ============================================================
+   FULL-SCREEN LINE CARD (Spotify-inspired immersive view)
+   ============================================================ */
+
+.line-card-fullscreen {
+    position: fixed;
+    inset: 0;
+    background: var(--accent);
+    z-index: 51;
+    display: flex;
+    flex-direction: column;
+    transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+    overscroll-behavior: contain;
+}
+
+.line-card-fullscreen.open {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.line-card-fullscreen.closed {
+    opacity: 0;
+    transform: translateY(100%);
+    pointer-events: none;
+}
+
+/* Top bar: close button + song title */
+.line-card-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    padding-top: max(12px, env(safe-area-inset-top));
+    flex-shrink: 0;
+}
+
+.line-card-close-btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 24px;
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+.line-card-close-btn:active {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.line-card-song-title {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.5);
+    text-align: center;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding: 0 8px;
+}
+
+/* Hero zone: lyric + translation, vertically centered */
+.line-card-hero {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 0 24px;
+    min-height: 0;
+}
+
+.line-card-lyric {
+    font-size: 32px;
+    font-weight: 700;
+    color: #fff;
+    text-align: center;
+    line-height: 1.3;
+    max-width: 100%;
+    word-wrap: break-word;
+}
+
+.line-card-translation {
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.5);
+    text-align: center;
+    margin-top: 12px;
+    cursor: pointer;
+    padding: 8px;
+    transition: filter 0.2s ease;
+}
+
+.line-card-translation.blurred {
+    filter: blur(6px);
+    user-select: none;
+}
+
+/* Thin playback progress bar */
+.line-card-progress-track {
+    width: 100%;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.15);
+    flex-shrink: 0;
+}
+
+.line-card-progress-fill {
+    height: 100%;
+    background: rgba(255, 255, 255, 0.8);
+    transition: width 0.1s linear;
+    width: 0%;
+}
+
+/* Bottom dock: transport + master */
+.line-card-dock {
+    padding: 16px 24px;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    flex-shrink: 0;
+}
+
+/* Transport row: gear, prev, play/pause, next, loop count */
+.line-card-transport {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.line-card-transport-btn {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 20px;
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+.line-card-transport-btn:active {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Play/pause: prominent white circle */
+.line-card-play-btn {
+    width: 52px;
+    height: 52px;
+    min-width: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    border: none;
+    border-radius: 50%;
+    color: var(--accent);
+    font-size: 22px;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+
+.line-card-play-btn:active {
+    transform: scale(0.92);
+}
+
+/* Gear (settings) button */
+.line-card-gear-btn {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 20px;
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+.line-card-gear-btn.active {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.line-card-gear-btn:active {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Loop count label (e.g. "3x") */
+.line-card-loop-count {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.4);
+    min-width: 30px;
+    text-align: left;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Gear panel: timing ±100ms controls */
+.line-card-gear-panel {
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 10px;
+    padding: 10px 16px;
+    margin: 0 0 12px;
+}
+
+.line-card-gear-panel .adjust-controls {
+    justify-content: center;
+}
+
+.line-card-gear-panel .adjust-label {
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 500;
+}
+
+.line-card-gear-panel .adjust-btn {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+
+.line-card-gear-panel .adjust-btn:active {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Master pill — full-width, rounded */
+.line-card-master-pill {
+    width: 100%;
+    height: 44px;
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.line-card-master-pill.mastered {
+    background: #fff;
+    color: var(--accent);
+    font-weight: 700;
+}
+
+.line-card-master-pill:active {
+    opacity: 0.85;
+}
+
 
 /* ── Waveform Timestamp Editor ─────────────────────────── */
 

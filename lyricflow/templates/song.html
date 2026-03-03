@@ -33,12 +33,7 @@
     </div>
 
     <!-- ===== WAVEFORM SYNC OVERLAY ===== -->
-    <div
-        class="card-overlay"
-        :class="{ hidden: !syncing }"
-        style="z-index:200;"
-    ></div>
-
+    <!-- No separate card-overlay needed: waveform-editor is full-screen with opaque bg -->
     <div
         x-show="syncing"
         class="waveform-editor"
@@ -151,7 +146,7 @@
         </div>
     </section>
 
-    <!-- ===== SLIDE-UP CARD: LINE MODE ===== -->
+    <!-- ===== FULL-SCREEN LINE CARD ===== -->
     <div
         class="card-overlay"
         :class="{ hidden: !show_line_card }"
@@ -159,85 +154,68 @@
     ></div>
 
     <div
-        class="slide-card"
+        class="line-card-fullscreen"
         :class="show_line_card ? 'open' : 'closed'"
-        @touchstart="handle_touch_start($event)"
-        @touchmove.prevent="handle_touch_move($event)"
-        @touchend="handle_touch_end($event)"
     >
-        <div class="card-handle"></div>
-
-        <div class="card-song-title" x-text="song.title"></div>
-        <div class="card-loop-counter" x-text="'\uD83D\uDD01 Loop ' + current_loop"></div>
-
-        <div class="card-line-number" x-show="current_line">
-            <span x-text="'LINE ' + (current_line ? current_line.line_number : '')"></span>
+        <!-- Top bar: close + song title -->
+        <div class="line-card-topbar">
+            <button class="line-card-close-btn" @click="close_card()">&times;</button>
+            <span class="line-card-song-title" x-text="song.title"></span>
+            <span style="width:44px"></span>
         </div>
 
-        <div class="card-line-text" x-text="current_line ? current_line.original_text : ''"></div>
-
-        <!-- Translation: tap text or eye button to show/hide -->
-        <div class="card-translation-row">
+        <!-- Hero zone: lyric + translation, vertically centered -->
+        <div class="line-card-hero">
+            <div class="line-card-lyric" x-text="current_line ? current_line.original_text : ''"></div>
             <div
-                class="card-translation"
-                :class="{ hidden: translation_hidden }"
+                class="line-card-translation"
+                :class="{ blurred: translation_hidden }"
                 @click="translation_hidden = !translation_hidden"
                 x-text="current_line ? (current_line.translation || 'Translation pending...') : ''"
             ></div>
-            <button
-                class="translation-toggle-btn"
-                @click="translation_hidden = !translation_hidden"
-                x-text="translation_hidden ? '👁' : '👁‍🗨'"
-            ></button>
         </div>
 
-        <!-- Loop progress bar: fills and shifts color as you loop -->
-        <div class="loop-bar-track">
-            <div
-                class="loop-bar-fill"
-                :class="{
-                    'halfway': current_loop >= 5 && current_loop < 10,
-                    'full': current_loop >= 10,
-                    'pulse': current_loop > 0
-                }"
-                :style="'width: ' + Math.min(current_loop, 10) * 10 + '%'"
-            ></div>
+        <!-- Playback progress bar: shows position within line clip -->
+        <div class="line-card-progress-track">
+            <div class="line-card-progress-fill" :style="'width:' + line_progress + '%'"></div>
         </div>
-        <div class="loop-bar-label" x-show="current_loop > 10" x-text="current_loop + ' loops'"></div>
 
-        <!-- Timing adjustment: toggle open, then ±100ms for start/end -->
-        <div class="card-timing-section">
-            <button class="timing-toggle-btn" @click="show_timing = !show_timing">
-                <span x-text="show_timing ? 'Hide Timing' : 'Adjust Timing'"></span>
-            </button>
-
-            <div class="card-timing-controls" x-show="show_timing" x-cloak>
-                <div class="adjust-controls">
-                    <span class="adjust-label">Start</span>
-                    <button class="adjust-btn" @click="adjust_time('start', -100)">-100ms</button>
-                    <span class="timing-value" x-text="current_line ? (current_line.start_time_ms / 1000).toFixed(1) + 's' : ''"></span>
-                    <button class="adjust-btn" @click="adjust_time('start', 100)">+100ms</button>
-                </div>
-                <div class="adjust-controls">
-                    <span class="adjust-label">End</span>
-                    <button class="adjust-btn" @click="adjust_time('end', -100)">-100ms</button>
-                    <span class="timing-value" x-text="current_line ? (current_line.end_time_ms / 1000).toFixed(1) + 's' : ''"></span>
-                    <button class="adjust-btn" @click="adjust_time('end', 100)">+100ms</button>
-                </div>
+        <!-- Gear panel: timing ±100ms controls (hidden by default) -->
+        <div class="line-card-gear-panel" x-show="show_gear_menu" x-cloak>
+            <div class="adjust-controls">
+                <span class="adjust-label">Start</span>
+                <button class="adjust-btn" @click="adjust_time('start', -100)">&minus;100ms</button>
+                <span class="timing-value" x-text="current_line ? (current_line.start_time_ms / 1000).toFixed(1) + 's' : ''"></span>
+                <button class="adjust-btn" @click="adjust_time('start', 100)">+100ms</button>
+            </div>
+            <div class="adjust-controls">
+                <span class="adjust-label">End</span>
+                <button class="adjust-btn" @click="adjust_time('end', -100)">&minus;100ms</button>
+                <span class="timing-value" x-text="current_line ? (current_line.end_time_ms / 1000).toFixed(1) + 's' : ''"></span>
+                <button class="adjust-btn" @click="adjust_time('end', 100)">+100ms</button>
             </div>
         </div>
 
-        <div class="card-actions">
+        <!-- Bottom dock: transport + master -->
+        <div class="line-card-dock">
+            <div class="line-card-transport">
+                <button class="line-card-gear-btn" :class="{ active: show_gear_menu }" @click="show_gear_menu = !show_gear_menu">
+                    &#9881;
+                </button>
+                <button class="line-card-transport-btn" @click="open_prev_line()">&#9198;</button>
+                <button class="line-card-play-btn" @click="toggle_pause()">
+                    <span x-text="is_paused ? '\u25B6' : '\u23F8'"></span>
+                </button>
+                <button class="line-card-transport-btn" @click="open_next_line()">&#9197;</button>
+                <span class="line-card-loop-count" x-text="current_loop > 0 ? current_loop + 'x' : ''"></span>
+            </div>
+
             <button
-                class="master-btn"
+                class="line-card-master-pill"
                 :class="{ mastered: current_line && current_line.is_mastered }"
                 @click="master_line()"
             >
                 <span x-text="current_line && current_line.is_mastered ? '&#10003; Mastered' : 'Master'"></span>
-            </button>
-
-            <button class="pause-btn" @click="toggle_pause()">
-                <span x-text="is_paused ? '\u25B6 Resume' : '\u23F8 Pause'"></span>
             </button>
         </div>
     </div>
@@ -319,7 +297,8 @@ function songPage(song_id) {
         max_dots: 10,
         is_paused: false,
         just_mastered_id: null,
-        show_timing: false,
+        show_gear_menu: false,
+        line_progress: 0,
         _save_timing_timeout: null,
         _pending_timing_line: null,
 
@@ -402,6 +381,8 @@ function songPage(song_id) {
             this.translation_hidden = false;
             this.current_loop = 0;
             this.is_paused = false;
+            this.show_gear_menu = false;
+            this.line_progress = 0;
             this.show_line_card = true;
 
             // Lock background scroll while card is open
@@ -414,6 +395,7 @@ function songPage(song_id) {
         close_card() {
             this.show_line_card = false;
             this.active_line_id = null;
+            this.line_progress = 0;
             this.stop_audio();
             // Flush pending timing save before closing so recent taps are not lost.
             if (this._save_timing_timeout && this._pending_timing_line) {
@@ -435,6 +417,47 @@ function songPage(song_id) {
                     end_time_ms: line.end_time_ms,
                 }),
             });
+        },
+
+        // Skip to previous line (wraps to last)
+        open_prev_line() {
+            if (!this.current_line || this.lines.length === 0) return;
+            const sorted = [...this.lines].sort((a, b) => a.line_number - b.line_number);
+            const idx = sorted.findIndex(l => l.id === this.current_line.id);
+            const prev = idx > 0 ? sorted[idx - 1] : sorted[sorted.length - 1];
+            // Flush pending timing save before switching
+            if (this._save_timing_timeout && this._pending_timing_line) {
+                clearTimeout(this._save_timing_timeout);
+                this.save_line_timing(this._pending_timing_line);
+                this._save_timing_timeout = null;
+                this._pending_timing_line = null;
+            }
+            this.current_line = prev;
+            this.active_line_id = prev.id;
+            this.current_loop = 0;
+            this.line_progress = 0;
+            this.show_gear_menu = false;
+            this.start_line_loop(prev);
+        },
+
+        // Skip to next line (wraps to first)
+        open_next_line() {
+            if (!this.current_line || this.lines.length === 0) return;
+            const sorted = [...this.lines].sort((a, b) => a.line_number - b.line_number);
+            const idx = sorted.findIndex(l => l.id === this.current_line.id);
+            const next = idx < sorted.length - 1 ? sorted[idx + 1] : sorted[0];
+            if (this._save_timing_timeout && this._pending_timing_line) {
+                clearTimeout(this._save_timing_timeout);
+                this.save_line_timing(this._pending_timing_line);
+                this._save_timing_timeout = null;
+                this._pending_timing_line = null;
+            }
+            this.current_line = next;
+            this.active_line_id = next.id;
+            this.current_loop = 0;
+            this.line_progress = 0;
+            this.show_gear_menu = false;
+            this.start_line_loop(next);
         },
 
         async master_line() {
@@ -621,6 +644,11 @@ function songPage(song_id) {
 
             this.loop_interval = setInterval(() => {
                 if (this._loop_state !== 'playing' || this.is_paused) return;
+
+                // Update playback progress bar (0-100%)
+                const elapsed = this.audio.currentTime - start_sec;
+                const duration = end_sec - start_sec;
+                this.line_progress = Math.max(0, Math.min(100, (elapsed / duration) * 100));
 
                 if (this.audio.currentTime >= end_sec) {
                     this.audio.pause();
