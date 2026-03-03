@@ -337,7 +337,9 @@ function songPage(song_id) {
 
         /* -- Audio engine ------------------------------------- */
         audio: null,           // reusable HTMLAudioElement
-        loop_interval: null,   // setInterval id for 50ms polling
+        loop_interval: null,   // setInterval id (50ms polling)
+        _restart_timeout: null, // setTimeout id (1s gap timer)
+        _loop_state: 'idle',   // 'idle' | 'playing' | 'waiting' | 'paused_in_gap'
 
         /* -- Tap-to-sync state -------------------------------- */
         syncing: false,
@@ -348,9 +350,6 @@ function songPage(song_id) {
         retap_index: null,
         timestamp_lines: [],
         _sync_time_interval: null,
-
-        /* -- Loop guard (prevents runaway counter) ------------- */
-        _loop_waiting: false,
 
         /* -- Touch gesture ------------------------------------ */
         touch_start_y: 0,
@@ -449,8 +448,26 @@ function songPage(song_id) {
 
             if (this.is_paused) {
                 this.audio.pause();
+                // If paused during the 1s gap, cancel the restart timer
+                if (this._loop_state === 'waiting') {
+                    clearTimeout(this._restart_timeout);
+                    this._restart_timeout = null;
+                    this._loop_state = 'paused_in_gap';
+                }
             } else {
-                this.audio.play();
+                if (this._loop_state === 'paused_in_gap') {
+                    // Resume from gap: restart the 1s gap timer
+                    this._loop_state = 'waiting';
+                    this._restart_timeout = setTimeout(() => {
+                        if (this._loop_state !== 'waiting') return;
+                        this._loop_state = 'playing';
+                        if (!this.show_line_card || this.is_paused) return;
+                        this.audio.currentTime = this.current_line.start_time_ms / 1000;
+                        this.audio.play().catch(() => {});
+                    }, 1000);
+                } else {
+                    this.audio.play();
+                }
             }
         },
 
@@ -486,8 +503,28 @@ function songPage(song_id) {
 
             if (this.stack_paused) {
                 this.audio.pause();
+                if (this._loop_state === 'waiting') {
+                    clearTimeout(this._restart_timeout);
+                    this._restart_timeout = null;
+                    this._loop_state = 'paused_in_gap';
+                }
             } else {
-                this.audio.play();
+                if (this._loop_state === 'paused_in_gap') {
+                    this._loop_state = 'waiting';
+                    const sl = this.stack_lines;
+                    const start_sec = sl[0].start_time_ms / 1000;
+                    this._restart_timeout = setTimeout(() => {
+                        if (this._loop_state !== 'waiting') return;
+                        this._loop_state = 'playing';
+                        if (!this.show_stack_card || this.stack_paused) return;
+                        this.audio.currentTime = start_sec;
+                        this.stack_current_id = sl[0].id;
+                        this.stack_current_number = sl[0].line_number;
+                        this.audio.play().catch(() => {});
+                    }, 1000);
+                } else {
+                    this.audio.play();
+                }
             }
         },
 
@@ -502,19 +539,20 @@ function songPage(song_id) {
 
             if (!this.song || !this.song.audio_file_path) return;
             if (line.start_time_ms == null || line.end_time_ms == null) return;
+            // Guard against corrupted timestamps (would cause instant end detection)
+            if (line.end_time_ms <= line.start_time_ms) return;
 
             if (!this.audio) this.audio = new Audio();
             const src = '/' + this.song.audio_file_path;
             const start_sec = line.start_time_ms / 1000;
             const end_sec = line.end_time_ms / 1000;
 
-            // Seek to start and begin playing + polling
             const begin_loop = () => {
                 this.audio.currentTime = start_sec;
                 this.audio.play().catch(err => console.warn('Autoplay blocked:', err));
+                this._loop_state = 'playing';
             };
 
-            // Only reload audio if source changed; wait for load before seeking
             const needs_load = !this.audio.src || !this.audio.src.includes(this.song.audio_file_path);
             if (needs_load) {
                 this.audio.src = src;
@@ -526,21 +564,20 @@ function songPage(song_id) {
                 begin_loop();
             }
 
-            this._loop_waiting = false;
             this.loop_interval = setInterval(() => {
-                if (this.is_paused || this._loop_waiting) return;
+                if (this._loop_state !== 'playing' || this.is_paused) return;
 
                 if (this.audio.currentTime >= end_sec) {
                     this.audio.pause();
                     this.current_loop++;
-                    this._loop_waiting = true;  // block until gap finishes
+                    this._loop_state = 'waiting';
 
-                    // Fire-and-forget: persist loop count
                     fetch('/api/lyrics/' + line.id + '/loop', { method: 'PUT' });
 
-                    // ~1 second gap between loops
-                    setTimeout(() => {
-                        this._loop_waiting = false;
+                    // Tracked 1s gap timer — can be cancelled by stop_audio()
+                    this._restart_timeout = setTimeout(() => {
+                        if (this._loop_state !== 'waiting') return;
+                        this._loop_state = 'playing';
                         if (!this.show_line_card || this.is_paused) return;
                         this.audio.currentTime = start_sec;
                         this.audio.play().catch(() => {});
@@ -562,6 +599,7 @@ function songPage(song_id) {
             const first_line = lines[0];
             const last_line = lines[lines.length - 1];
             if (first_line.start_time_ms == null || last_line.end_time_ms == null) return;
+            if (last_line.end_time_ms <= first_line.start_time_ms) return;
 
             if (!this.audio) this.audio = new Audio();
             const src = '/' + this.song.audio_file_path;
@@ -571,6 +609,7 @@ function songPage(song_id) {
             const begin_loop = () => {
                 this.audio.currentTime = start_sec;
                 this.audio.play().catch(err => console.warn('Autoplay blocked:', err));
+                this._loop_state = 'playing';
             };
 
             const needs_load = !this.audio.src || !this.audio.src.includes(this.song.audio_file_path);
@@ -584,9 +623,8 @@ function songPage(song_id) {
                 begin_loop();
             }
 
-            this._loop_waiting = false;
             this.loop_interval = setInterval(() => {
-                if (this.stack_paused || this._loop_waiting) return;
+                if (this._loop_state !== 'playing' || this.stack_paused) return;
 
                 const current_ms = this.audio.currentTime * 1000;
                 this.update_current_stack_line(current_ms, lines);
@@ -594,10 +632,11 @@ function songPage(song_id) {
                 if (this.audio.currentTime >= end_sec) {
                     this.audio.pause();
                     this.stack_loop++;
-                    this._loop_waiting = true;  // block until gap finishes
+                    this._loop_state = 'waiting';
 
-                    setTimeout(() => {
-                        this._loop_waiting = false;
+                    this._restart_timeout = setTimeout(() => {
+                        if (this._loop_state !== 'waiting') return;
+                        this._loop_state = 'playing';
                         if (!this.show_stack_card || this.stack_paused) return;
                         this.audio.currentTime = start_sec;
                         this.stack_current_id = lines[0].id;
@@ -614,6 +653,12 @@ function songPage(song_id) {
                 clearInterval(this.loop_interval);
                 this.loop_interval = null;
             }
+            // Cancel any pending gap timer (prevents zombie playback)
+            if (this._restart_timeout) {
+                clearTimeout(this._restart_timeout);
+                this._restart_timeout = null;
+            }
+            this._loop_state = 'idle';
         },
 
         /* Walk backward: last line whose start <= current wins */
