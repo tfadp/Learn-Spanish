@@ -61,15 +61,29 @@ def translate_song_endpoint(song_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="No lyrics to translate")
 
     # --- 3. Check JSON cache first (instant), fall back to API ---
+    # Cache is only valid if its line count matches the DB — if lyrics
+    # were re-synced or edited, the cache is stale and must be rebuilt.
     cached = load_cached_translations(song_id)
-    if cached:
+    cache_valid = False
+    if cached and len(cached) == len(lines):
+        # Cache is valid only if every line_number+original pair still matches.
+        cached_by_number = {
+            entry.get("line_number"): entry for entry in cached if isinstance(entry, dict)
+        }
+        cache_valid = all(
+            (
+                line.line_number in cached_by_number
+                and cached_by_number[line.line_number].get("original") == line.original_text
+            )
+            for line in lines
+        )
+
+    if cache_valid:
         # Build a lookup: line_number → translation
         cache_lookup = {
-            entry["line_number"]: entry["translation"] for entry in cached
+            entry.get("line_number"): entry.get("translation", "") for entry in cached
         }
-        translations = [
-            cache_lookup.get(line.line_number, "") for line in lines
-        ]
+        translations = [cache_lookup.get(line.line_number, "") for line in lines]
     else:
         # No cache — call Claude API and save result for next time
         original_texts = [line.original_text for line in lines]
@@ -87,8 +101,10 @@ def translate_song_endpoint(song_id: int, db: Session = Depends(get_db)):
         )
 
     # --- 4. Persist translations to DB ---
+    # Skip empty strings so we don't overwrite existing good translations
     for line, translated_text in zip(lines, translations):
-        line.translation = translated_text
+        if translated_text:
+            line.translation = translated_text
 
     db.commit()
 

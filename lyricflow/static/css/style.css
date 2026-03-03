@@ -342,9 +342,20 @@ body {
     color: var(--text-dim);
 }
 
-/* Mastered line: green check, slightly dimmed text */
+/* Mastered line: green check with pop-in animation, slightly dimmed text */
 .line-item.mastered .line-marker {
     color: var(--green);
+}
+
+/* Checkmark pops in when a line is first mastered */
+.line-item.flash-green .line-marker {
+    animation: check-pop 0.3s ease forwards;
+}
+
+@keyframes check-pop {
+    0%   { transform: scale(0); }
+    70%  { transform: scale(1.2); }
+    100% { transform: scale(1.0); }
 }
 
 .line-item.mastered .line-text {
@@ -519,6 +530,12 @@ body {
     padding: 4px;
     opacity: 0.5;
     flex-shrink: 0;
+    /* 44px minimum touch target for mobile */
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .translation-toggle-btn:active {
@@ -623,6 +640,8 @@ body {
     cursor: pointer;
     padding: 0.3rem 0.6rem;
     opacity: 0.7;
+    /* 44px minimum touch target for mobile */
+    min-height: 44px;
 }
 
 .timing-toggle-btn:active {

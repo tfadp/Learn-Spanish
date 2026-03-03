@@ -354,6 +354,7 @@ function songPage(song_id) {
         just_mastered_id: null,
         show_timing: false,
         _save_timing_timeout: null,
+        _pending_timing_line: null,
 
         /* -- Stack card state --------------------------------- */
         show_stack_card: false,
@@ -446,7 +447,26 @@ function songPage(song_id) {
             this.show_line_card = false;
             this.active_line_id = null;
             this.stop_audio();
+            // Flush pending timing save before closing so recent taps are not lost.
+            if (this._save_timing_timeout && this._pending_timing_line) {
+                clearTimeout(this._save_timing_timeout);
+                this.save_line_timing(this._pending_timing_line);
+            }
+            this._save_timing_timeout = null;
+            this._pending_timing_line = null;
             document.body.style.overflow = '';
+        },
+
+        save_line_timing(line) {
+            if (!line) return;
+            fetch('/api/lyrics/' + line.id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    start_time_ms: line.start_time_ms,
+                    end_time_ms: line.end_time_ms,
+                }),
+            });
         },
 
         async master_line() {
@@ -488,6 +508,8 @@ function songPage(song_id) {
                 const new_val = this.current_line.end_time_ms + delta_ms;
                 // Don't go at or below start
                 if (new_val <= this.current_line.start_time_ms) return;
+                // Don't exceed audio duration (if known)
+                if (this.audio && this.audio.duration && new_val > this.audio.duration * 1000) return;
                 this.current_line.end_time_ms = new_val;
             }
 
@@ -495,16 +517,15 @@ function songPage(song_id) {
             this.start_line_loop(this.current_line);
 
             // Debounced save — waits 500ms after last tap
+            // Capture line reference now so the callback is safe even if
+            // the card closes before the timeout fires (Issue #1)
+            const line_to_save = this.current_line;
             clearTimeout(this._save_timing_timeout);
+            this._pending_timing_line = line_to_save;
             this._save_timing_timeout = setTimeout(() => {
-                fetch('/api/lyrics/' + this.current_line.id, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        start_time_ms: this.current_line.start_time_ms,
-                        end_time_ms: this.current_line.end_time_ms,
-                    }),
-                });
+                if (!line_to_save) return;
+                this.save_line_timing(line_to_save);
+                this._pending_timing_line = null;
             }, 500);
         },
 

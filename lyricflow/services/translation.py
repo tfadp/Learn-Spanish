@@ -29,8 +29,12 @@ def load_cached_translations(song_id: int) -> list[dict] | None:
     cache_path = get_cache_path(song_id)
     if not cache_path.exists():
         return None
-    with open(cache_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(cache_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):
+        # Corrupt or unreadable cache — treat as missing so API gets called
+        return None
 
 
 def save_cached_translations(
