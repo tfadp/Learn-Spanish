@@ -68,9 +68,11 @@ app.include_router(timestamps.router, prefix="/api")
 
 @app.get("/sw.js")
 async def service_worker():
+    # no-cache so the browser always checks for a new service worker version
     return FileResponse(
         STATIC_DIR / "sw.js",
         media_type="application/javascript",
+        headers={"Cache-Control": "no-cache"},
     )
 
 

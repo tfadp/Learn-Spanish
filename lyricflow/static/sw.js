@@ -2,12 +2,12 @@
 // Caches static assets (CSS, JS, fonts) for fast repeat loads.
 // API calls and audio files are always fetched live.
 
-const CACHE_NAME = 'lyricflow-v1';
+const CACHE_NAME = 'lyricflow-v7';
 
 // Assets to pre-cache on install
 const PRECACHE_URLS = [
-  '/static/css/style.css',
-  '/static/js/app.js',
+  '/static/css/style.css?v=6',
+  '/static/js/app.js?v=6',
   '/static/icons/icon-512.svg',
 ];
 
@@ -33,7 +33,10 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch: stale-while-revalidate for static assets, network-only for API/audio
+// Fetch strategy:
+// - /static/* → stale-while-revalidate (fast loads, background update)
+// - HTML pages → network-first (always get fresh HTML from server)
+// - API, audio → skip (let browser handle normally)
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
@@ -46,21 +49,30 @@ self.addEventListener('fetch', (event) => {
   // Audio files — always go to network (too large to cache)
   if (url.pathname.endsWith('.mp3')) return;
 
-  // Everything else: stale-while-revalidate
-  event.respondWith(
-    caches.open(CACHE_NAME).then((cache) =>
-      cache.match(event.request).then((cached) => {
-        const fetched = fetch(event.request).then((response) => {
-          // Only cache successful responses
-          if (response.ok) {
-            cache.put(event.request, response.clone());
-          }
-          return response;
-        }).catch(() => cached); // If network fails, fall back to cache
+  // Static assets only: stale-while-revalidate
+  if (url.pathname.startsWith('/static/')) {
+    event.respondWith(
+      caches.open(CACHE_NAME).then((cache) =>
+        cache.match(event.request).then((cached) => {
+          const fetched = fetch(event.request).then((response) => {
+            if (response.ok) {
+              cache.put(event.request, response.clone());
+            }
+            return response;
+          }).catch(() => cached);
 
-        // Return cached version immediately, or wait for network
-        return cached || fetched;
-      })
+          return cached || fetched;
+        })
+      )
+    );
+    return;
+  }
+
+  // HTML pages: network-first (always get fresh content from server)
+  // Falls back to cache only if network is down (true offline mode)
+  event.respondWith(
+    fetch(event.request).catch(() =>
+      caches.match(event.request)
     )
   );
 });

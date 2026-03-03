@@ -1,11 +1,12 @@
 # todo.md — Roadmap
 
 ## Session State
-- branch: main (ca77ca6)
-- last_test: 13/13 pytest tests passing (2026-03-02)
+- branch: main (95c69dc)
+- last_test: 13/13 pytest tests passing (2026-03-03)
 - blocked: none
 - pending_decisions: none
 - server: running on 0.0.0.0:8000 (phone access at 172.17.7.14:8000)
+- note: song.html has uncommitted changes (unrelated to session 6 work)
 
 ## Completed (Session 1)
 - [x] Project structure created (Path B — proper folders)
@@ -59,10 +60,22 @@
   - Phase 3: Save (reuses existing PUT endpoint)
 - [x] Real NUEVAYoL lyrics: 40 lines inserted, translated, 26 auto-timestamped
 
+## Completed (Session 5)
+- [x] Line card UI fix: Master + Pause buttons side-by-side (was stacked)
+- [x] Mastery toggle: tap to master, tap again to un-master (was one-way)
+- [x] Master button visuals flipped: ghost/grey when unmastered, solid white when mastered
+
+## Completed (Session 6)
+- [x] Translation JSON caching (translations/<song_id>.json)
+  - Cache functions in services/translation.py (load/save)
+  - Translate route checks JSON cache before calling Anthropic API
+  - CLI script: `python translate_cli.py <song_id>` for offline pre-translation
+  - Pushed to GitHub (d5f6ecc)
+
 ## Next 3 Steps
-1) ~~Initialize git repo + first commit~~ DONE — pushed to GitHub (learn-spanish)
-2) PWA manifest + service worker
-3) Deploy to DigitalOcean
+1) PWA manifest + service worker
+2) Deploy to DigitalOcean
+3) Phone testing pass — verify all gestures + audio on real device
 
 ## Backlog
 - Improve Whisper accuracy (try "small" model, better fuzzy matching)

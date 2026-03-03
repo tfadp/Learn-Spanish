@@ -6,8 +6,9 @@ WORKDIR /app
 COPY requirements-deploy.txt .
 RUN pip install --no-cache-dir -r requirements-deploy.txt
 
-# Copy application code
+# Copy application code + translation cache
 COPY lyricflow/ lyricflow/
+COPY translations/ translations/
 
 # Create uploads directory
 RUN mkdir -p lyricflow/static/uploads

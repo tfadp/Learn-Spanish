@@ -27,6 +27,8 @@ lyricflow/static/css/style.css   — Dark theme, mobile-first CSS
 lyricflow/static/js/app.js       — Alpine.js components + audio engine
 lyricflow/templates/library.html — Song Library screen
 lyricflow/templates/song.html    — Checklist + slide-up card screen
+translate_cli.py                 — CLI: offline song translation
+translations/                    — JSON cache: one file per song
 
 ## Project Rules
 - Check .claude/SPECS.md only when modifying naming, schemas, or contracts.
