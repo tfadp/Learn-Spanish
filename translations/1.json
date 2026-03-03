@@ -1,202 +1,312 @@
 [
   {
     "line_number": 1,
-    "original": "Si te quieres divertir",
-    "translation": "If you want to have fun"
+    "original": "Nueva York!",
+    "translation": "New York!"
   },
   {
     "line_number": 2,
-    "original": "Con encanto y con primor",
-    "translation": "With charm and elegance"
+    "original": "Si te quieres divertir",
+    "translation": "If you want to have fun"
   },
   {
     "line_number": 3,
-    "original": "Solo tienes que vivir (¿pa' dónde?)",
-    "translation": "You just have to live (where to?)"
+    "original": "Con encanto y con primor",
+    "translation": "With charm and elegance"
   },
   {
     "line_number": 4,
-    "original": "Un verano en Nueva York (¡Nueva York!)",
-    "translation": "A summer in New York (New York!)"
+    "original": "Solo tienes que vivir (¿a dónde?)",
+    "translation": "You just have to live (where?)"
   },
   {
     "line_number": 5,
-    "original": "Si te quieres divertir",
-    "translation": "If you want to have fun"
-  },
-  {
-    "line_number": 6,
-    "original": "Con encanto y con primor",
-    "translation": "With charm and elegance"
-  },
-  {
-    "line_number": 7,
-    "original": "Solo tienes que vivir",
-    "translation": "You just have to live"
-  },
-  {
-    "line_number": 8,
-    "original": "Un verano en Nueva York",
-    "translation": "A summer in New York"
-  },
-  {
-    "line_number": 9,
-    "original": "Dime dónde, dime dónde",
-    "translation": "Tell me where, tell me where"
-  },
-  {
-    "line_number": 10,
-    "original": "Ay, dime dónde, dime dónde",
-    "translation": "Oh, tell me where, tell me where"
-  },
-  {
-    "line_number": 11,
-    "original": "Con la vieja guardia",
-    "translation": "With the old guard"
-  },
-  {
-    "line_number": 12,
-    "original": "Dime dónde, dime dónde",
-    "translation": "Tell me where, tell me where"
-  },
-  {
-    "line_number": 13,
-    "original": "Ay, dime dónde, dime dónde",
-    "translation": "Oh, tell me where, tell me where"
-  },
-  {
-    "line_number": 14,
-    "original": "Ah-ah",
-    "translation": "Ah-ah"
-  },
-  {
-    "line_number": 15,
-    "original": "Tú ere' mai, mami, yo te llevo a NY",
-    "translation": "You're fine, baby, I'll take you to NY"
-  },
-  {
-    "line_number": 16,
-    "original": "Tú ere' mai, mami, yo te llevo a NY",
-    "translation": "You're fine, baby, I'll take you to NY"
-  },
-  {
-    "line_number": 17,
-    "original": "Tú quiere' party, party, ey",
-    "translation": "You want to party, party, hey"
-  },
-  {
-    "line_number": 18,
-    "original": "Te presento el Boogie Down",
-    "translation": "Let me show you the Boogie Down"
-  },
-  {
-    "line_number": 19,
-    "original": "Ey, no e' Brooklyn, e' El Bronx (¡El Bronx!)",
-    "translation": "Hey, it's not Brooklyn, it's the Bronx (The Bronx!)"
-  },
-  {
-    "line_number": 20,
-    "original": "Ey, aquí estamos firme'",
-    "translation": "Hey, here we stand strong"
-  },
-  {
-    "line_number": 21,
-    "original": "Caminamo' The Concourse",
-    "translation": "We walk The Concourse"
-  },
-  {
-    "line_number": 22,
-    "original": "De aquí son Fat Joe y Big Pun",
-    "translation": "Fat Joe and Big Pun are from here"
-  },
-  {
-    "line_number": 23,
-    "original": "Subimo' al tren, sentamo' en el bus",
-    "translation": "We get on the train, sit on the bus"
-  },
-  {
-    "line_number": 24,
-    "original": "Si te quieres divertir",
-    "translation": "If you want to have fun"
-  },
-  {
-    "line_number": 25,
-    "original": "Con encanto y con primor",
-    "translation": "With charm and elegance"
-  },
-  {
-    "line_number": 26,
-    "original": "Solo tienes que vivir (¿pa' dónde?)",
-    "translation": "You just have to live (where to?)"
-  },
-  {
-    "line_number": 27,
     "original": "Un verano en Nueva York (¡Nueva York!)",
     "translation": "A summer in New York (New York!)"
   },
   {
-    "line_number": 28,
+    "line_number": 6,
     "original": "Si te quieres divertir",
     "translation": "If you want to have fun"
   },
   {
+    "line_number": 7,
+    "original": "Con encanto y con primor (¿pero qué es esto?)",
+    "translation": "With charm and elegance (but what is this?)"
+  },
+  {
+    "line_number": 8,
+    "original": "Solo tienes que vivir (¿y este frío?)",
+    "translation": "You just have to live (and this cold?)"
+  },
+  {
+    "line_number": 9,
+    "original": "Un verano en Nueva York (un ratito na'má)",
+    "translation": "A summer in New York (just a little bit)"
+  },
+  {
+    "line_number": 10,
+    "original": "Ey, ey, ey, 4 de julio, fourth of July",
+    "translation": "Hey, hey, hey, July 4th, fourth of July"
+  },
+  {
+    "line_number": 11,
+    "original": "Ando con mi prima, borracha, rulay",
+    "translation": "I'm with my cousin, drunk, crazy"
+  },
+  {
+    "line_number": 12,
+    "original": "Los mío' en el Bronx saben la que hay",
+    "translation": "My people in the Bronx know what's up"
+  },
+  {
+    "line_number": 13,
+    "original": "Con la nota en high por Washington Heights",
+    "translation": "Getting high in Washington Heights"
+  },
+  {
+    "line_number": 14,
+    "original": "Willie Colón, me dicen el malo, ey",
+    "translation": "Willie Colón, they call me the bad one, hey"
+  },
+  {
+    "line_number": 15,
+    "original": "Porque pasan los año' y sigo dando palo'",
+    "translation": "Because years pass and I keep hitting hard"
+  },
+  {
+    "line_number": 16,
+    "original": "Vendiendo disco', como cuadro'e Frida Kahlo",
+    "translation": "Selling records like Frida Kahlo paintings"
+  },
+  {
+    "line_number": 17,
+    "original": "El perico es blanco, sí, sí",
+    "translation": "The coke is white, yes, yes"
+  },
+  {
+    "line_number": 18,
+    "original": "El tusi es rosita, eh-eh",
+    "translation": "The tusi is pink, eh-eh"
+  },
+  {
+    "line_number": 19,
+    "original": "No te confunda', no, no",
+    "translation": "Don't get confused, no, no"
+  },
+  {
+    "line_number": 20,
+    "original": "Mejor evita, ey",
+    "translation": "Better avoid it, hey"
+  },
+  {
+    "line_number": 21,
+    "original": "Un shot de cañita en casa de Toñita, ay",
+    "translation": "A shot of rum at Toñita's house, ay"
+  },
+  {
+    "line_number": 22,
+    "original": "PR se siente cerquita",
+    "translation": "PR feels so close"
+  },
+  {
+    "line_number": 23,
+    "original": "Sí, sí, sí",
+    "translation": "Yes, yes, yes"
+  },
+  {
+    "line_number": 24,
+    "original": "Tengo el campeonato, nadie me lo quita",
+    "translation": "I have the championship, nobody can take it from me"
+  },
+  {
+    "line_number": 25,
+    "original": "The best in the world",
+    "translation": "The best in the world"
+  },
+  {
+    "line_number": 26,
+    "original": "Number one, the best in the world, okay?",
+    "translation": "Number one, the best in the world, okay?"
+  },
+  {
+    "line_number": 27,
+    "original": "Puerto Rico",
+    "translation": "Puerto Rico"
+  },
+  {
+    "line_number": 28,
+    "original": "¿Cómo Bad Bunny va a ser rey del pop?, ey",
+    "translation": "How is Bad Bunny going to be king of pop?, hey"
+  },
+  {
     "line_number": 29,
+    "original": "Con reguetón y dembow, ey",
+    "translation": "With reggaeton and dembow, hey"
+  },
+  {
+    "line_number": 30,
+    "original": "Con reguetón y dembow, sí",
+    "translation": "With reggaeton and dembow, yes"
+  },
+  {
+    "line_number": 31,
+    "original": "Con reguetón y dembow",
+    "translation": "With reggaeton and dembow"
+  },
+  {
+    "line_number": 32,
+    "original": "¿Cómo Bad Bunny va a ser rey del pop?, ey",
+    "translation": "How is Bad Bunny going to be king of pop?, hey"
+  },
+  {
+    "line_number": 33,
+    "original": "Con reguetón y dembow",
+    "translation": "With reggaeton and dembow"
+  },
+  {
+    "line_number": 34,
+    "original": "Me siento como el Lápiz en \"Capea el Dough\"",
+    "translation": "I feel like Lápiz in \"Capea el Dough\""
+  },
+  {
+    "line_number": 35,
+    "original": "Cuando yo nací fue que nació el flow",
+    "translation": "When I was born is when flow was born"
+  },
+  {
+    "line_number": 36,
+    "original": "De lao a lao, ping-pong",
+    "translation": "Side to side, ping-pong"
+  },
+  {
+    "line_number": 37,
+    "original": "Flow pesado, Big Pun",
+    "translation": "Heavy flow, Big Pun"
+  },
+  {
+    "line_number": 38,
+    "original": "Con silenciador le robamos las gata'",
+    "translation": "With a silencer we steal the girls"
+  },
+  {
+    "line_number": 39,
+    "original": "James Bond, ey",
+    "translation": "James Bond, hey"
+  },
+  {
+    "line_number": 40,
+    "original": "Yo estoy en la mía, no tengo adversario', no",
+    "translation": "I'm in my zone, I have no rivals, no"
+  },
+  {
+    "line_number": 41,
+    "original": "Con los Yankees y los Mets, Juan Soto",
+    "translation": "With the Yankees and the Mets, Juan Soto"
+  },
+  {
+    "line_number": 42,
+    "original": "A correr, que otra vez la sacamo'el estadio",
+    "translation": "Run, we knocked it out of the stadium again"
+  },
+  {
+    "line_number": 43,
+    "original": "Si te quieres divertir",
+    "translation": "If you want to have fun"
+  },
+  {
+    "line_number": 44,
     "original": "Con encanto y con primor",
     "translation": "With charm and elegance"
   },
   {
-    "line_number": 30,
-    "original": "Solo tienes que vivir",
-    "translation": "You just have to live"
+    "line_number": 45,
+    "original": "Solo tienes que vivir (ya mismo nos vamo)",
+    "translation": "You just have to live (we're leaving right now)"
   },
   {
-    "line_number": 31,
-    "original": "Un verano en Nueva York",
-    "translation": "A summer in New York"
+    "line_number": 46,
+    "original": "Un verano en Nueva Y- (un ratito más, un ratito)",
+    "translation": "A summer in New Y- (a little more, a little bit)"
   },
   {
-    "line_number": 32,
-    "original": "Dime dónde, dime dónde",
-    "translation": "Tell me where, tell me where"
+    "line_number": 47,
+    "original": "Shh, cuidao, que nadie nos escuche",
+    "translation": "Shh, be careful, don't let anyone hear us"
   },
   {
-    "line_number": 33,
-    "original": "Ay, dime dónde, dime dónde",
-    "translation": "Oh, tell me where, tell me where"
+    "line_number": 48,
+    "original": "Shh, cuidao, que nadie nos escuche",
+    "translation": "Shh, be careful, don't let anyone hear us"
   },
   {
-    "line_number": 34,
-    "original": "Con la vieja guardia",
-    "translation": "With the old guard"
+    "line_number": 49,
+    "original": "Shh, cuidao, que nadie nos escuche",
+    "translation": "Shh, be careful, don't let anyone hear us"
   },
   {
-    "line_number": 35,
-    "original": "Dime dónde, dime dónde",
-    "translation": "Tell me where, tell me where"
+    "line_number": 50,
+    "original": "Shh, cuida-",
+    "translation": "Shh, care-"
   },
   {
-    "line_number": 36,
-    "original": "Ay, dime dónde, dime dónde",
-    "translation": "Oh, tell me where, tell me where"
+    "line_number": 51,
+    "original": "Tú tienes piquete, mami, yo también",
+    "translation": "You got style, mama, me too"
   },
   {
-    "line_number": 37,
-    "original": "Ah-ah",
-    "translation": "Ah-ah"
+    "line_number": 52,
+    "original": "Tú estás buena, yo estoy bueno también",
+    "translation": "You look good, I look good too"
   },
   {
-    "line_number": 38,
-    "original": "Si tú lo quiere'",
-    "translation": "If you want it"
+    "line_number": 53,
+    "original": "Huelo rico y ando con los de cien",
+    "translation": "I smell good and I roll with the hundred-dollar bills"
   },
   {
-    "line_number": 39,
-    "original": "Lo tiene' que romper",
-    "translation": "You have to tear it up"
+    "line_number": 54,
+    "original": "Si tú los quieres, lo tienes que mové",
+    "translation": "If you want them, you gotta move it"
   },
   {
-    "line_number": 40,
-    "original": "Si tú lo quiere', lo tiene' que mover",
-    "translation": "If you want it, you have to move it"
+    "line_number": 55,
+    "original": "Tú tienes piquete, mami, yo también",
+    "translation": "You got style, mama, me too"
+  },
+  {
+    "line_number": 56,
+    "original": "Tú estás buena, yo estoy bueno también",
+    "translation": "You look good, I look good too"
+  },
+  {
+    "line_number": 57,
+    "original": "Huelo rico y ando con los de cien",
+    "translation": "I smell good and I roll with the hundred-dollar bills"
+  },
+  {
+    "line_number": 58,
+    "original": "Si tú los quieres, lo tienes que mové",
+    "translation": "If you want them, you gotta move it"
+  },
+  {
+    "line_number": 59,
+    "original": "Lo tienes que mové, ve-ve-ve-ve-ve-ve-ve-ve-ve-ve-ve",
+    "translation": "You gotta move it, ve-ve-ve-ve-ve-ve-ve-ve-ve-ve-ve"
+  },
+  {
+    "line_number": 60,
+    "original": "Lo tienes que mové, ve-ve-ve-ve-ve-ve-ve-ve-ve-ve-ve",
+    "translation": "You gotta move it, ve-ve-ve-ve-ve-ve-ve-ve-ve-ve-ve"
+  },
+  {
+    "line_number": 61,
+    "original": "Lo tienes que mové, ve-ve-ve-ve-ve-ve-ve-ve-ve-ve-ve",
+    "translation": "You gotta move it, ve-ve-ve-ve-ve-ve-ve-ve-ve-ve-ve"
+  },
+  {
+    "line_number": 62,
+    "original": "Lo tienes que mové, ve-ve-ve-ve-ve-ve-ve-ve-ve-ve-ve-ve-ve-ve-ve",
+    "translation": "You gotta move it, ve-ve-ve-ve-ve-ve-ve-ve-ve-ve-ve-ve-ve-ve-ve"
   }
 ]
