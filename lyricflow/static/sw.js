@@ -2,12 +2,12 @@
 // Caches static assets (CSS, JS, fonts) for fast repeat loads.
 // API calls and audio files are always fetched live.
 
-const CACHE_NAME = 'lyricflow-v9';
+const CACHE_NAME = 'lyricflow-v10';
 
 // Assets to pre-cache on install
 const PRECACHE_URLS = [
-  '/static/css/style.css?v=8',
-  '/static/js/app.js?v=8',
+  '/static/css/style.css?v=9',
+  '/static/js/app.js?v=9',
   '/static/icons/icon-512.svg',
 ];
 

@@ -209,13 +209,20 @@
 
         <div class="card-line-text" x-text="current_line ? current_line.original_text : ''"></div>
 
-        <!-- Translation: visible by default, tap to toggle (SPECS.md domain rule) -->
-        <div
-            class="card-translation"
-            :class="{ hidden: translation_hidden }"
-            @click="translation_hidden = !translation_hidden"
-            x-text="current_line ? (current_line.translation || 'Translation pending...') : ''"
-        ></div>
+        <!-- Translation: tap text or eye button to show/hide -->
+        <div class="card-translation-row">
+            <div
+                class="card-translation"
+                :class="{ hidden: translation_hidden }"
+                @click="translation_hidden = !translation_hidden"
+                x-text="current_line ? (current_line.translation || 'Translation pending...') : ''"
+            ></div>
+            <button
+                class="translation-toggle-btn"
+                @click="translation_hidden = !translation_hidden"
+                x-text="translation_hidden ? '👁' : '👁‍🗨'"
+            ></button>
+        </div>
 
         <!-- Loop progress bar: fills and shifts color as you loop -->
         <div class="loop-bar-track">

@@ -502,7 +502,30 @@ body {
     margin-bottom: 8px;
 }
 
-/* Translation — tap to hide per SPECS.md: "Translation visible by default. Tap to hide." */
+/* Translation row: text + eye toggle side by side */
+.card-translation-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.translation-toggle-btn {
+    background: none;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px;
+    opacity: 0.5;
+    flex-shrink: 0;
+}
+
+.translation-toggle-btn:active {
+    opacity: 1;
+}
+
+/* Translation — tap text or eye button to show/hide */
 .card-translation {
     font-size: 14px;
     color: rgba(255, 255, 255, 0.5);
@@ -513,7 +536,6 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 20px;
     transition: filter 0.2s ease;
 }
 
