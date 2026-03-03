@@ -217,19 +217,19 @@
             x-text="current_line ? (current_line.translation || 'Translation pending...') : ''"
         ></div>
 
-        <!-- Loop dots: up to 10 dots, then show number -->
-        <div class="loop-dots">
-            <template x-if="current_loop <= max_dots">
-                <div style="display:flex; align-items:center; justify-content:center; gap:6px;">
-                    <template x-for="i in max_dots" :key="i">
-                        <span class="loop-dot" :class="{ active: i <= current_loop }"></span>
-                    </template>
-                </div>
-            </template>
-            <template x-if="current_loop > max_dots">
-                <span class="loop-count-number" x-text="current_loop + ' loops'"></span>
-            </template>
+        <!-- Loop progress bar: fills and shifts color as you loop -->
+        <div class="loop-bar-track">
+            <div
+                class="loop-bar-fill"
+                :class="{
+                    'halfway': current_loop >= 5 && current_loop < 10,
+                    'full': current_loop >= 10,
+                    'pulse': current_loop > 0
+                }"
+                :style="'width: ' + Math.min(current_loop, 10) * 10 + '%'"
+            ></div>
         </div>
+        <div class="loop-bar-label" x-show="current_loop > 10" x-text="current_loop + ' loops'"></div>
 
         <!-- Timing adjustment: toggle open, then ±100ms for start/end -->
         <div class="card-timing-section">
