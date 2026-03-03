@@ -3,6 +3,9 @@
 {% block title %}Song — LyricFlow{% endblock %}
 
 {% block content %}
+<!-- Wavesurfer.js: visual waveform + draggable regions for timestamp editing -->
+<script src="https://unpkg.com/wavesurfer.js@7/dist/wavesurfer.min.js"></script>
+<script src="https://unpkg.com/wavesurfer.js@7/dist/plugins/regions.min.js"></script>
 <!--
     Main learning screen: Checklist + Slide-up Card (Line & Stack modes).
     Self-contained: audio engine, touch gestures, mastery — all inline.
@@ -29,7 +32,7 @@
         </button>
     </div>
 
-    <!-- ===== TAP-TO-SYNC OVERLAY ===== -->
+    <!-- ===== WAVEFORM SYNC OVERLAY ===== -->
     <div
         class="card-overlay"
         :class="{ hidden: !syncing }"
@@ -38,108 +41,72 @@
 
     <div
         x-show="syncing"
-        style="position:fixed; inset:0; z-index:201; background:var(--bg-primary); overflow-y:auto; padding:16px;"
+        class="waveform-editor"
+        x-cloak
     >
-        <!-- Cancel button -->
-        <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
-            <button class="btn-secondary" @click="cancel_resync()" style="font-size:0.85rem; padding:4px 12px;">
+        <!-- Top bar: Cancel / Title / Save -->
+        <div class="waveform-topbar">
+            <button class="btn-secondary waveform-cancel-btn" @click="cancel_resync()">
                 Cancel
+            </button>
+            <h2 class="waveform-title">Sync Timestamps</h2>
+            <button class="btn-primary waveform-save-btn" @click="confirm_resync()">
+                Save
             </button>
         </div>
 
-        <!-- TAP PHASE -->
-        <div x-show="sync_phase === 'tap'" class="sync-container">
-            <div class="sync-header">
-                <h2>Tap to Sync</h2>
-                <p>Tap <strong>Mark</strong> when each line starts in the song</p>
-            </div>
+        <!-- Waveform — Wavesurfer renders here -->
+        <div class="waveform-container" x-ref="waveform_container"></div>
 
-            <div class="sync-progress">
-                <span x-text="sync_marks.filter(m => m.start_time_ms !== null).length + ' / ' + sync_marks.length + ' lines synced'"></span>
-            </div>
-
-            <div class="sync-controls">
-                <button
-                    class="btn-secondary sync-play-btn"
-                    @click="sync_playing ? pause_sync() : play_sync()"
-                    x-text="sync_playing ? '\u23F8 Pause' : '\u25B6 Play'"
-                ></button>
-                <span class="sync-time" x-text="audio ? format_time(Math.round(audio.currentTime * 1000)) : '0:00.0'"></span>
-            </div>
-
-            <div class="sync-lyrics" x-ref="sync_lyrics_list">
-                <template x-for="(mark, index) in sync_marks" :key="index">
-                    <div
-                        class="sync-line"
-                        :class="{
-                            'past': mark.start_time_ms !== null && index < sync_current_index,
-                            'active': index === sync_current_index,
-                            'future': index > sync_current_index && mark.start_time_ms === null
-                        }"
-                        x-effect="index === sync_current_index && $el.scrollIntoView({block: 'center', behavior: 'smooth'})"
-                    >
-                        <span class="sync-line-number" x-text="index + 1"></span>
-                        <span class="sync-line-text" x-text="mark.original_text"></span>
-                        <span class="sync-line-check" x-show="mark.start_time_ms !== null">&#10003;</span>
-                    </div>
-                </template>
-            </div>
-
+        <!-- Playback controls -->
+        <div class="waveform-controls">
             <button
-                class="sync-mark-btn"
-                @click="tap_mark()"
-                :disabled="!sync_playing"
-            >Mark</button>
-
-            <div class="sync-bottom-row">
-                <button class="btn-secondary sync-skip-btn" @click="skip_line()" :disabled="!sync_playing">Skip</button>
-                <button class="btn-secondary sync-done-btn" @click="finish_first_pass()">Done</button>
-            </div>
+                class="waveform-play-btn"
+                @click="ws_toggle_play()"
+                x-text="ws_playing ? '\u23F8 Pause' : '\u25B6 Play'"
+            ></button>
+            <button
+                class="waveform-loop-btn"
+                :class="{ active: ws_loop_selected }"
+                @click="ws_toggle_loop()"
+                x-show="ws_selected_line !== null"
+            >
+                Loop Selected
+            </button>
+            <span class="waveform-time" x-text="ws_current_time_display"></span>
         </div>
 
-        <!-- REVIEW PHASE -->
-        <div x-show="sync_phase === 'review'">
-            <div class="timestamp-summary">
-                <span class="match-count" x-text="sync_marks.filter(m => m.start_time_ms !== null).length + '/' + sync_marks.length + ' lines synced'"></span>
-            </div>
+        <!-- Synced count -->
+        <div class="waveform-progress">
+            <span x-text="sync_marks.filter(m => m.start_time_ms !== null && m.end_time_ms !== null).length + '/' + sync_marks.length + ' lines synced'"></span>
+        </div>
 
-            <div class="timestamp-list">
-                <template x-for="(line, index) in timestamp_lines" :key="index">
-                    <div class="timestamp-row" :class="{'sync-unset': line.start_time_ms == null}">
-                        <span class="timestamp-row-number" x-text="line.line_number"></span>
-                        <span class="timestamp-row-text" x-text="line.original_text"></span>
+        <!-- Line list — tap to select + create/jump to region -->
+        <div class="waveform-line-list" x-ref="waveform_line_list">
+            <template x-for="(mark, index) in sync_marks" :key="mark.line_id">
+                <div
+                    class="waveform-line-row"
+                    :class="{
+                        selected: ws_selected_line === index,
+                        synced: mark.start_time_ms !== null && mark.end_time_ms !== null
+                    }"
+                    @click="ws_select_line(index)"
+                >
+                    <span class="waveform-line-number" x-text="mark.line_number"></span>
+                    <span class="waveform-line-text" x-text="mark.original_text"></span>
+                    <span class="waveform-line-check" x-show="mark.start_time_ms !== null && mark.end_time_ms !== null">&#10003;</span>
+                    <span
+                        class="waveform-line-time"
+                        x-show="mark.start_time_ms !== null"
+                        x-text="format_time(mark.start_time_ms) + ' \u2192 ' + format_time(mark.end_time_ms)"
+                    ></span>
+                </div>
+            </template>
+        </div>
 
-                        <span
-                            class="timestamp-row-time"
-                            @click="sync_toggle_adjust(index)"
-                            x-text="format_time(line.start_time_ms) + ' \u2192 ' + format_time(line.end_time_ms)"
-                        ></span>
-
-                        <button class="retap-btn" @click="retap_line(index)">Re-tap</button>
-
-                        <button
-                            class="play-segment-btn"
-                            @click="play_segment(line)"
-                            x-show="line.start_time_ms != null"
-                            aria-label="Play segment"
-                        >&#9654;</button>
-
-                        <div class="adjust-controls" x-show="line.adjusting">
-                            <span class="adjust-label">Start</span>
-                            <button class="adjust-btn" @click="sync_adjust_time(index, 'start_time_ms', -100)">-100ms</button>
-                            <button class="adjust-btn" @click="sync_adjust_time(index, 'start_time_ms', 100)">+100ms</button>
-                            <span class="adjust-label">End</span>
-                            <button class="adjust-btn" @click="sync_adjust_time(index, 'end_time_ms', -100)">-100ms</button>
-                            <button class="adjust-btn" @click="sync_adjust_time(index, 'end_time_ms', 100)">+100ms</button>
-                        </div>
-                    </div>
-                </template>
-            </div>
-
-            <button
-                class="btn-primary"
-                @click="confirm_resync()"
-            >Confirm &amp; Save</button>
+        <!-- Help text -->
+        <div class="waveform-help">
+            Tap a line, then drag the colored region on the waveform to set its boundaries.
         </div>
     </div>
 
@@ -370,15 +337,16 @@ function songPage(song_id) {
         _restart_timeout: null, // setTimeout id (1s gap timer)
         _loop_state: 'idle',   // 'idle' | 'playing' | 'waiting' | 'paused_in_gap'
 
-        /* -- Tap-to-sync state -------------------------------- */
+        /* -- Waveform sync state ------------------------------ */
         syncing: false,
-        sync_phase: 'tap',
-        sync_current_index: 0,
-        sync_playing: false,
         sync_marks: [],
-        retap_index: null,
-        timestamp_lines: [],
-        _sync_time_interval: null,
+        ws_instance: null,       // WaveSurfer instance
+        ws_regions: null,        // Regions plugin instance
+        ws_region_map: {},       // {line_index: region_object}
+        ws_selected_line: null,  // index into sync_marks
+        ws_playing: false,
+        ws_loop_selected: false,
+        ws_current_time_display: '0:00.0',
 
         /* -- Touch gesture ------------------------------------ */
         touch_start_y: 0,
@@ -761,137 +729,208 @@ function songPage(song_id) {
             this.stack_current_number = lines[0].line_number;
         },
 
-        /* ===== TAP-TO-SYNC (re-sync timestamps) ============== */
+        /* ===== WAVEFORM SYNC (visual timestamp editor) ======= */
 
         start_resync() {
+            // Preserve existing timestamps (don't null them out)
             this.sync_marks = this.lines.map(l => ({
                 line_id: l.id,
                 line_number: l.line_number,
                 original_text: l.original_text,
-                start_time_ms: null,
-                end_time_ms: null,
+                start_time_ms: l.start_time_ms,
+                end_time_ms: l.end_time_ms,
             }));
-            this.sync_phase = 'tap';
-            this.sync_current_index = 0;
-            this.retap_index = null;
-            this.sync_playing = false;
+            this.ws_selected_line = null;
+            this.ws_playing = false;
+            this.ws_loop_selected = false;
+            this.ws_region_map = {};
             this.syncing = true;
 
             this.stop_audio();
-            if (!this.audio) this.audio = new Audio();
-            this.audio.src = '/' + this.song.audio_file_path;
-
             document.body.style.overflow = 'hidden';
+
+            // Init Wavesurfer after Alpine renders the container
+            this.$nextTick(() => { this.ws_init_wavesurfer(); });
         },
 
-        cancel_resync() {
-            this.pause_sync();
-            this.syncing = false;
-            document.body.style.overflow = '';
-        },
+        ws_init_wavesurfer() {
+            const container = this.$refs.waveform_container;
+            if (!container) return;
 
-        play_sync() {
-            if (!this.audio) return;
-            this.audio.play().catch(err => console.warn('Autoplay blocked:', err));
-            this.sync_playing = true;
-            this._sync_time_interval = setInterval(() => {
-                this.sync_playing = !this.audio.paused;
-            }, 200);
-        },
-
-        pause_sync() {
-            if (this.audio) this.audio.pause();
-            this.sync_playing = false;
-            if (this._sync_time_interval) {
-                clearInterval(this._sync_time_interval);
-                this._sync_time_interval = null;
-            }
-        },
-
-        tap_mark() {
-            if (!this.audio || !this.sync_playing) return;
-
-            const now_ms = Math.round(this.audio.currentTime * 1000);
-            const idx = this.retap_index !== null ? this.retap_index : this.sync_current_index;
-
-            this.sync_marks[idx].start_time_ms = now_ms;
-
-            if (idx > 0 && this.sync_marks[idx - 1].start_time_ms !== null) {
-                this.sync_marks[idx - 1].end_time_ms = now_ms;
-            }
-
-            if (this.retap_index !== null) {
-                this.retap_index = null;
-                this.pause_sync();
-                this._compute_end_times();
-                this._build_review_lines();
-                this.sync_phase = 'review';
+            // Guard: CDN might fail to load
+            if (typeof WaveSurfer === 'undefined') {
+                alert('Waveform editor failed to load. Check your internet connection.');
+                this.cancel_resync();
                 return;
             }
 
-            if (this.sync_current_index < this.sync_marks.length - 1) {
-                this.sync_current_index++;
-            } else {
-                this.finish_first_pass();
-            }
-        },
+            this.ws_regions = WaveSurfer.Regions.create();
 
-        skip_line() {
-            if (this.sync_current_index < this.sync_marks.length - 1) {
-                this.sync_current_index++;
-            } else {
-                this.finish_first_pass();
-            }
-        },
+            this.ws_instance = WaveSurfer.create({
+                container: container,
+                waveColor: '#5e5b6e',
+                progressColor: '#9B2D5E',
+                cursorColor: '#ece9f4',
+                cursorWidth: 1,
+                height: 100,
+                barWidth: 2,
+                barGap: 1,
+                barRadius: 2,
+                normalize: true,
+                url: '/' + this.song.audio_file_path,
+                plugins: [this.ws_regions],
+            });
 
-        finish_first_pass() {
-            this.pause_sync();
-            this._compute_end_times();
-            this._build_review_lines();
-            this.sync_phase = 'review';
-        },
+            // When audio is decoded, add existing regions
+            this.ws_instance.on('ready', () => {
+                this.ws_populate_regions();
+            });
 
-        _compute_end_times() {
-            for (let i = 0; i < this.sync_marks.length; i++) {
-                const mark = this.sync_marks[i];
-                if (mark.start_time_ms === null) continue;
+            this.ws_instance.on('play', () => { this.ws_playing = true; });
+            this.ws_instance.on('pause', () => { this.ws_playing = false; });
 
-                let next_start = null;
-                for (let j = i + 1; j < this.sync_marks.length; j++) {
-                    if (this.sync_marks[j].start_time_ms !== null) {
-                        next_start = this.sync_marks[j].start_time_ms;
-                        break;
+            // Update time display + handle loop logic
+            this.ws_instance.on('timeupdate', (time) => {
+                this.ws_current_time_display = this.format_time(Math.round(time * 1000));
+
+                // Loop within selected region if enabled
+                if (this.ws_loop_selected && this.ws_selected_line !== null) {
+                    const mark = this.sync_marks[this.ws_selected_line];
+                    if (mark.end_time_ms !== null && time >= mark.end_time_ms / 1000) {
+                        this.ws_instance.setTime(mark.start_time_ms / 1000);
                     }
                 }
+            });
 
-                if (next_start !== null) {
-                    mark.end_time_ms = next_start;
-                } else if (mark.end_time_ms === null) {
-                    mark.end_time_ms = mark.start_time_ms + 3000;
+            // Region drag/resize end — update sync_marks
+            this.ws_regions.on('region-updated', (region) => {
+                const idx = this.ws_find_line_index(region);
+                if (idx === null) return;
+                this.sync_marks[idx].start_time_ms = Math.round(region.start * 1000);
+                this.sync_marks[idx].end_time_ms = Math.round(region.end * 1000);
+            });
+
+            // Region clicked — select that line
+            this.ws_regions.on('region-clicked', (region, e) => {
+                e.stopPropagation();
+                const idx = this.ws_find_line_index(region);
+                if (idx !== null) this.ws_select_line(idx);
+            });
+        },
+
+        // Add colored regions for lines that already have timestamps
+        ws_populate_regions() {
+            const colors = this.ws_generate_colors(this.sync_marks.length);
+            this.sync_marks.forEach((mark, index) => {
+                if (mark.start_time_ms !== null && mark.end_time_ms !== null) {
+                    const region = this.ws_regions.addRegion({
+                        start: mark.start_time_ms / 1000,
+                        end: mark.end_time_ms / 1000,
+                        color: colors[index],
+                        drag: true,
+                        resize: true,
+                        id: 'line-' + index,
+                    });
+                    this.ws_region_map[index] = region;
+                }
+            });
+        },
+
+        // Golden angle hue rotation for distinct colors across many lines
+        ws_generate_colors(count) {
+            const colors = [];
+            for (let i = 0; i < count; i++) {
+                const hue = (330 + i * 137) % 360;
+                colors.push('hsla(' + hue + ', 60%, 50%, 0.25)');
+            }
+            return colors;
+        },
+
+        // Tap a line → select it, jump waveform to it, create region if needed
+        ws_select_line(index) {
+            this.ws_selected_line = index;
+
+            // Scroll line into view
+            this.$nextTick(() => {
+                const list = this.$refs.waveform_line_list;
+                if (!list) return;
+                const row = list.children[index];
+                if (row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            });
+
+            const mark = this.sync_marks[index];
+
+            // If line already has a region, seek to it
+            if (mark.start_time_ms !== null && this.ws_instance) {
+                const seek = Math.max(0, mark.start_time_ms / 1000 - 1);
+                this.ws_instance.setTime(seek);
+                return;
+            }
+
+            // No region yet — create a 3-second region at the playhead
+            if (this.ws_instance) {
+                const now = this.ws_instance.getCurrentTime();
+                const dur = this.ws_instance.getDuration();
+                const start = now;
+                const end = Math.min(now + 3, dur);
+
+                mark.start_time_ms = Math.round(start * 1000);
+                mark.end_time_ms = Math.round(end * 1000);
+
+                const colors = this.ws_generate_colors(this.sync_marks.length);
+                const region = this.ws_regions.addRegion({
+                    start: start,
+                    end: end,
+                    color: colors[index],
+                    drag: true,
+                    resize: true,
+                    id: 'line-' + index,
+                });
+                this.ws_region_map[index] = region;
+            }
+        },
+
+        // Find which line index a region belongs to
+        ws_find_line_index(region) {
+            for (const [idx, reg] of Object.entries(this.ws_region_map)) {
+                if (reg === region) return parseInt(idx);
+            }
+            return null;
+        },
+
+        ws_toggle_play() {
+            if (!this.ws_instance) return;
+            this.ws_instance.playPause();
+        },
+
+        ws_toggle_loop() {
+            this.ws_loop_selected = !this.ws_loop_selected;
+            // If turning on, seek to region start and play
+            if (this.ws_loop_selected && this.ws_selected_line !== null) {
+                const mark = this.sync_marks[this.ws_selected_line];
+                if (mark.start_time_ms !== null && this.ws_instance) {
+                    this.ws_instance.setTime(mark.start_time_ms / 1000);
+                    if (!this.ws_playing) this.ws_instance.play();
                 }
             }
         },
 
-        _build_review_lines() {
-            this.timestamp_lines = this.sync_marks.map(m => ({
-                line_number: m.line_number,
-                original_text: m.original_text,
-                start_time_ms: m.start_time_ms,
-                end_time_ms: m.end_time_ms,
-                adjusting: false,
-            }));
+        ws_destroy() {
+            if (this.ws_instance) {
+                this.ws_instance.destroy();
+                this.ws_instance = null;
+            }
+            this.ws_regions = null;
+            this.ws_region_map = {};
+            this.ws_selected_line = null;
+            this.ws_playing = false;
+            this.ws_loop_selected = false;
         },
 
-        retap_line(index) {
-            this.retap_index = index;
-            this.sync_current_index = index;
-
-            const start = this.sync_marks[index].start_time_ms;
-            const seek_to = Math.max(0, (start !== null ? start : 0) - 2000);
-            this.audio.currentTime = seek_to / 1000;
-
-            this.sync_phase = 'tap';
-            this.play_sync();
+        cancel_resync() {
+            this.ws_destroy();
+            this.syncing = false;
+            document.body.style.overflow = '';
         },
 
         format_time(ms) {
@@ -902,54 +941,7 @@ function songPage(song_id) {
             return m + ':' + s.padStart(4, '0');
         },
 
-        play_segment(line) {
-            if (!this.audio) this.audio = new Audio();
-            const src = '/' + this.song.audio_file_path;
-            const start_sec = (line.start_time_ms || 0) / 1000;
-            const end_sec = (line.end_time_ms || 0) / 1000;
-
-            const seek_and_play = () => {
-                this.audio.currentTime = start_sec;
-                this.audio.play().catch(() => {});
-                const check = () => {
-                    if (this.audio.currentTime >= end_sec) {
-                        this.audio.pause();
-                    } else {
-                        requestAnimationFrame(check);
-                    }
-                };
-                check();
-            };
-
-            const needs_load = !this.audio.src || !this.audio.src.includes(this.song.audio_file_path);
-            if (needs_load) {
-                this.audio.src = src;
-                this.audio.addEventListener('loadedmetadata', seek_and_play, { once: true });
-            } else {
-                seek_and_play();
-            }
-        },
-
-        sync_adjust_time(index, field, delta) {
-            const line = this.timestamp_lines[index];
-            const current = line[field] || 0;
-            line[field] = Math.max(0, current + delta);
-        },
-
-        sync_toggle_adjust(index) {
-            this.timestamp_lines[index].adjusting = !this.timestamp_lines[index].adjusting;
-        },
-
-        _sync_review_to_marks() {
-            for (let i = 0; i < this.timestamp_lines.length; i++) {
-                this.sync_marks[i].start_time_ms = this.timestamp_lines[i].start_time_ms;
-                this.sync_marks[i].end_time_ms = this.timestamp_lines[i].end_time_ms;
-            }
-        },
-
         async confirm_resync() {
-            this._sync_review_to_marks();
-
             const timestamps = this.sync_marks
                 .filter(m => m.start_time_ms != null && m.end_time_ms != null)
                 .map(m => ({
@@ -959,7 +951,7 @@ function songPage(song_id) {
                 }));
 
             if (timestamps.length === 0) {
-                alert('No timestamps to save. Tap some lines first.');
+                alert('No timestamps to save. Select lines and set regions first.');
                 return;
             }
 
@@ -973,7 +965,7 @@ function songPage(song_id) {
                     alert('Failed to save timestamps. Please try again.');
                     return;
                 }
-                // Reload song data to pick up new timestamps
+                this.ws_destroy();
                 this.syncing = false;
                 document.body.style.overflow = '';
                 await this.load_song();
