@@ -231,22 +231,19 @@
             </template>
         </div>
 
-        <button
-            class="master-btn"
-            @click="master_line()"
-            x-show="current_line && !current_line.is_mastered"
-        >&#10003; Mastered</button>
+        <div class="card-actions">
+            <button
+                class="master-btn"
+                :class="{ mastered: current_line && current_line.is_mastered }"
+                @click="master_line()"
+            >
+                <span x-text="current_line && current_line.is_mastered ? '&#10003; Mastered' : 'Master'"></span>
+            </button>
 
-        <button
-            class="master-btn"
-            disabled
-            style="opacity: 0.5; cursor: default;"
-            x-show="current_line && current_line.is_mastered"
-        >&#10003; Already Mastered</button>
-
-        <button class="pause-btn" @click="toggle_pause()">
-            <span x-text="is_paused ? '\u25B6 Resume' : '\u23F8 Pause'"></span>
-        </button>
+            <button class="pause-btn" @click="toggle_pause()">
+                <span x-text="is_paused ? '\u25B6 Resume' : '\u23F8 Pause'"></span>
+            </button>
+        </div>
     </div>
 
     <!-- ===== SLIDE-UP CARD: STACK MODE ===== -->
@@ -431,14 +428,17 @@ function songPage(song_id) {
                 );
 
                 if (res.ok) {
-                    this.current_line.is_mastered = true;
-                    this.just_mastered_id = this.current_line.id;
+                    this.current_line.is_mastered = !this.current_line.is_mastered;
 
-                    setTimeout(() => { this.just_mastered_id = null; }, 700);
-                    setTimeout(() => { this.close_card(); }, 400);
+                    if (this.current_line.is_mastered) {
+                        // Just mastered — flash green in checklist, then close card
+                        this.just_mastered_id = this.current_line.id;
+                        setTimeout(() => { this.just_mastered_id = null; }, 700);
+                        setTimeout(() => { this.close_card(); }, 400);
+                    }
                 }
             } catch (err) {
-                console.error('Failed to master line:', err);
+                console.error('Failed to toggle mastery:', err);
             }
         },
 

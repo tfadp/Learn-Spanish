@@ -559,20 +559,32 @@ body {
     padding: 4px 6px;
 }
 
-/* "Mastered" button — full width, white bg, accent text */
+/* Side-by-side button row inside the card */
+.card-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* Master button — ghost/outline by default (not yet mastered) */
 .master-btn {
-    width: 100%;
+    flex: 1;
     padding: 14px;
     border-radius: 14px;
-    background: #fff;
-    color: var(--accent);
-    font-size: 16px;
-    font-weight: 700;
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 14px;
+    font-weight: 500;
     border: none;
     cursor: pointer;
     min-height: 48px;
-    transition: opacity 0.2s ease;
-    margin-bottom: 10px;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+/* When mastered — solid white with accent text */
+.master-btn.mastered {
+    background: #fff;
+    color: var(--accent);
+    font-weight: 700;
 }
 
 .master-btn:active {
@@ -581,7 +593,7 @@ body {
 
 /* Pause button — subtle, translucent white */
 .pause-btn {
-    width: 100%;
+    flex: 1;
     padding: 14px;
     border-radius: 14px;
     background: rgba(255, 255, 255, 0.1);
