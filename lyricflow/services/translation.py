@@ -4,8 +4,48 @@
 
 import json
 import os
+from pathlib import Path
 
 from anthropic import Anthropic
+
+# JSON cache lives at project root → translations/<song_id>.json
+# Easy to find, hand-edit, and version-control if desired.
+TRANSLATIONS_DIR = Path(__file__).resolve().parent.parent.parent / "translations"
+
+
+def get_cache_path(song_id: int) -> Path:
+    """Return the path to a song's translation cache file."""
+    return TRANSLATIONS_DIR / f"{song_id}.json"
+
+
+def load_cached_translations(song_id: int) -> list[dict] | None:
+    """
+    Load translations from the JSON cache file.
+
+    Returns a list of dicts like:
+        [{"line_number": 1, "original": "...", "translation": "..."}, ...]
+    Returns None if no cache file exists.
+    """
+    cache_path = get_cache_path(song_id)
+    if not cache_path.exists():
+        return None
+    with open(cache_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_cached_translations(
+    song_id: int,
+    lines_data: list[dict],
+) -> None:
+    """
+    Save translations to a JSON cache file for instant future loads.
+
+    lines_data: list of {"line_number": int, "original": str, "translation": str}
+    """
+    TRANSLATIONS_DIR.mkdir(parents=True, exist_ok=True)
+    cache_path = get_cache_path(song_id)
+    with open(cache_path, "w", encoding="utf-8") as f:
+        json.dump(lines_data, f, ensure_ascii=False, indent=2)
 
 
 def translate_song(lines: list[str], language: str) -> list[str]:

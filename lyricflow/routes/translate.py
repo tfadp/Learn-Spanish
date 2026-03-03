@@ -7,7 +7,11 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import LyricLine, Song
-from ..services.translation import translate_song
+from ..services.translation import (
+    load_cached_translations,
+    save_cached_translations,
+    translate_song,
+)
 
 router = APIRouter(prefix="/songs", tags=["translate"])
 
@@ -56,11 +60,33 @@ def translate_song_endpoint(song_id: int, db: Session = Depends(get_db)):
     if not lines:
         raise HTTPException(status_code=400, detail="No lyrics to translate")
 
-    # --- 3. Translate via Claude ---
-    original_texts = [line.original_text for line in lines]
-    translations = translate_song(original_texts, song.language)
+    # --- 3. Check JSON cache first (instant), fall back to API ---
+    cached = load_cached_translations(song_id)
+    if cached:
+        # Build a lookup: line_number → translation
+        cache_lookup = {
+            entry["line_number"]: entry["translation"] for entry in cached
+        }
+        translations = [
+            cache_lookup.get(line.line_number, "") for line in lines
+        ]
+    else:
+        # No cache — call Claude API and save result for next time
+        original_texts = [line.original_text for line in lines]
+        translations = translate_song(original_texts, song.language)
+        save_cached_translations(
+            song_id,
+            [
+                {
+                    "line_number": line.line_number,
+                    "original": line.original_text,
+                    "translation": t,
+                }
+                for line, t in zip(lines, translations)
+            ],
+        )
 
-    # --- 4. Persist translations ---
+    # --- 4. Persist translations to DB ---
     for line, translated_text in zip(lines, translations):
         line.translation = translated_text
 
