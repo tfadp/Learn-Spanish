@@ -231,6 +231,28 @@
             </template>
         </div>
 
+        <!-- Timing adjustment: toggle open, then ±100ms for start/end -->
+        <div class="card-timing-section">
+            <button class="timing-toggle-btn" @click="show_timing = !show_timing">
+                <span x-text="show_timing ? 'Hide Timing' : 'Adjust Timing'"></span>
+            </button>
+
+            <div class="card-timing-controls" x-show="show_timing" x-cloak>
+                <div class="adjust-controls">
+                    <span class="adjust-label">Start</span>
+                    <button class="adjust-btn" @click="adjust_time('start', -100)">-100ms</button>
+                    <span class="timing-value" x-text="current_line ? (current_line.start_time_ms / 1000).toFixed(1) + 's' : ''"></span>
+                    <button class="adjust-btn" @click="adjust_time('start', 100)">+100ms</button>
+                </div>
+                <div class="adjust-controls">
+                    <span class="adjust-label">End</span>
+                    <button class="adjust-btn" @click="adjust_time('end', -100)">-100ms</button>
+                    <span class="timing-value" x-text="current_line ? (current_line.end_time_ms / 1000).toFixed(1) + 's' : ''"></span>
+                    <button class="adjust-btn" @click="adjust_time('end', 100)">+100ms</button>
+                </div>
+            </div>
+        </div>
+
         <div class="card-actions">
             <button
                 class="master-btn"
@@ -323,6 +345,8 @@ function songPage(song_id) {
         max_dots: 10,
         is_paused: false,
         just_mastered_id: null,
+        show_timing: false,
+        _save_timing_timeout: null,
 
         /* -- Stack card state --------------------------------- */
         show_stack_card: false,
@@ -440,6 +464,41 @@ function songPage(song_id) {
             } catch (err) {
                 console.error('Failed to toggle mastery:', err);
             }
+        },
+
+        // Adjust start or end timestamp by delta_ms, then restart the loop
+        // so the new boundaries take effect immediately. Debounces the
+        // server save so rapid taps don't hammer the API.
+        adjust_time(which, delta_ms) {
+            if (!this.current_line) return;
+
+            if (which === 'start') {
+                const new_val = this.current_line.start_time_ms + delta_ms;
+                // Don't go below 0 or past the end
+                if (new_val < 0 || new_val >= this.current_line.end_time_ms) return;
+                this.current_line.start_time_ms = new_val;
+            } else {
+                const new_val = this.current_line.end_time_ms + delta_ms;
+                // Don't go at or below start
+                if (new_val <= this.current_line.start_time_ms) return;
+                this.current_line.end_time_ms = new_val;
+            }
+
+            // Restart the loop so new boundaries take effect
+            this.start_line_loop(this.current_line);
+
+            // Debounced save — waits 500ms after last tap
+            clearTimeout(this._save_timing_timeout);
+            this._save_timing_timeout = setTimeout(() => {
+                fetch('/api/lyrics/' + this.current_line.id, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        start_time_ms: this.current_line.start_time_ms,
+                        end_time_ms: this.current_line.end_time_ms,
+                    }),
+                });
+            }, 500);
         },
 
         toggle_pause() {

@@ -559,6 +559,41 @@ body {
     padding: 4px 6px;
 }
 
+/* Timing adjustment section in Line Card */
+.card-timing-section {
+    padding-top: 0.25rem;
+}
+
+.timing-toggle-btn {
+    background: none;
+    border: none;
+    color: var(--text-mid);
+    font-size: 0.75rem;
+    cursor: pointer;
+    padding: 0.3rem 0.6rem;
+    opacity: 0.7;
+}
+
+.timing-toggle-btn:active {
+    opacity: 1;
+}
+
+.card-timing-controls {
+    padding: 0.4rem 0;
+}
+
+.card-timing-controls .adjust-controls {
+    justify-content: center;
+}
+
+.timing-value {
+    color: var(--text-mid);
+    font-size: 0.75rem;
+    min-width: 40px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
 /* Side-by-side button row inside the card */
 .card-actions {
     display: flex;
