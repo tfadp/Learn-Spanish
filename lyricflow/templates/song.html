@@ -509,7 +509,7 @@ function songPage(song_id) {
             const end_sec = line.end_time_ms / 1000;
 
             // Seek to start and begin playing + polling
-            const beginLoop = () => {
+            const begin_loop = () => {
                 this.audio.currentTime = start_sec;
                 this.audio.play().catch(err => console.warn('Autoplay blocked:', err));
             };
@@ -518,9 +518,12 @@ function songPage(song_id) {
             const needs_load = !this.audio.src || !this.audio.src.includes(this.song.audio_file_path);
             if (needs_load) {
                 this.audio.src = src;
-                this.audio.addEventListener('loadedmetadata', beginLoop, { once: true });
+                this.audio.addEventListener('loadedmetadata', begin_loop, { once: true });
+                this.audio.addEventListener('error', () => {
+                    console.error('Audio failed to load:', src);
+                }, { once: true });
             } else {
-                beginLoop();
+                begin_loop();
             }
 
             this._loop_waiting = false;
@@ -565,7 +568,7 @@ function songPage(song_id) {
             const start_sec = first_line.start_time_ms / 1000;
             const end_sec = last_line.end_time_ms / 1000;
 
-            const beginLoop = () => {
+            const begin_loop = () => {
                 this.audio.currentTime = start_sec;
                 this.audio.play().catch(err => console.warn('Autoplay blocked:', err));
             };
@@ -573,9 +576,12 @@ function songPage(song_id) {
             const needs_load = !this.audio.src || !this.audio.src.includes(this.song.audio_file_path);
             if (needs_load) {
                 this.audio.src = src;
-                this.audio.addEventListener('loadedmetadata', beginLoop, { once: true });
+                this.audio.addEventListener('loadedmetadata', begin_loop, { once: true });
+                this.audio.addEventListener('error', () => {
+                    console.error('Audio failed to load:', src);
+                }, { once: true });
             } else {
-                beginLoop();
+                begin_loop();
             }
 
             this._loop_waiting = false;
@@ -766,18 +772,30 @@ function songPage(song_id) {
 
         play_segment(line) {
             if (!this.audio) this.audio = new Audio();
-            this.audio.src = '/' + this.song.audio_file_path;
-            this.audio.currentTime = (line.start_time_ms || 0) / 1000;
-            this.audio.play();
-            const end = (line.end_time_ms || 0) / 1000;
-            const check = () => {
-                if (this.audio.currentTime >= end) {
-                    this.audio.pause();
-                } else {
-                    requestAnimationFrame(check);
-                }
+            const src = '/' + this.song.audio_file_path;
+            const start_sec = (line.start_time_ms || 0) / 1000;
+            const end_sec = (line.end_time_ms || 0) / 1000;
+
+            const seek_and_play = () => {
+                this.audio.currentTime = start_sec;
+                this.audio.play().catch(() => {});
+                const check = () => {
+                    if (this.audio.currentTime >= end_sec) {
+                        this.audio.pause();
+                    } else {
+                        requestAnimationFrame(check);
+                    }
+                };
+                check();
             };
-            check();
+
+            const needs_load = !this.audio.src || !this.audio.src.includes(this.song.audio_file_path);
+            if (needs_load) {
+                this.audio.src = src;
+                this.audio.addEventListener('loadedmetadata', seek_and_play, { once: true });
+            } else {
+                seek_and_play();
+            }
         },
 
         sync_adjust_time(index, field, delta) {
@@ -814,11 +832,15 @@ function songPage(song_id) {
             }
 
             try {
-                await fetch('/api/songs/' + this.song_id + '/timestamps', {
+                const res = await fetch('/api/songs/' + this.song_id + '/timestamps', {
                     method: 'PUT',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({timestamps})
                 });
+                if (!res.ok) {
+                    alert('Failed to save timestamps. Please try again.');
+                    return;
+                }
                 // Reload song data to pick up new timestamps
                 this.syncing = false;
                 document.body.style.overflow = '';

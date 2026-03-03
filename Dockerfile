@@ -8,7 +8,6 @@ RUN pip install --no-cache-dir -r requirements-deploy.txt
 
 # Copy application code
 COPY lyricflow/ lyricflow/
-COPY tests/ tests/
 
 # Create uploads directory
 RUN mkdir -p lyricflow/static/uploads
