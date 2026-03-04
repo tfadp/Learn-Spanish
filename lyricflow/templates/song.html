@@ -969,10 +969,12 @@ function songPage(song_id) {
 
             const mark = this.sync_marks[index];
 
-            // If line already has a region, seek to it
+            // If line already has a region, zoom to it and loop
             if (mark.start_time_ms !== null && this.ws_instance) {
-                const seek = Math.max(0, mark.start_time_ms / 1000 - 1);
-                this.ws_instance.setTime(seek);
+                this.ws_focus_region(mark.start_time_ms / 1000, mark.end_time_ms / 1000);
+                this.ws_loop_selected = true;
+                this.ws_instance.setTime(mark.start_time_ms / 1000);
+                if (!this.ws_playing) this.ws_instance.play();
                 return;
             }
 
@@ -1012,14 +1014,13 @@ function songPage(song_id) {
             this.ws_tap_mode = 'end';
         },
 
-        // Capture current playback time as line end, create region
+        // Capture current playback time as line end, create region,
+        // then auto-zoom to region and start looping it
         ws_mark_end() {
             if (!this.ws_instance || this.ws_selected_line === null) return;
             let s = this.ws_tap_start_sec;
             let e = this.ws_instance.getCurrentTime();
-            // Swap if somehow reversed
             if (e < s) { const tmp = s; s = e; e = tmp; }
-            // Minimum 0.3s
             if (e - s < 0.3) e = s + 0.3;
 
             const mark = this.sync_marks[this.ws_selected_line];
@@ -1037,6 +1038,33 @@ function songPage(song_id) {
             this.ws_region_map[this.ws_selected_line] = region;
             this.ws_tap_mode = null;
             this.ws_tap_start_sec = null;
+
+            // Auto-zoom so region fills ~60% of screen width, with padding
+            this.ws_focus_region(s, e);
+
+            // Auto-loop the region so user hears it and can drag edges
+            this.ws_loop_selected = true;
+            this.ws_instance.setTime(s);
+            if (!this.ws_playing) this.ws_instance.play();
+        },
+
+        // Zoom + scroll to show a time range with padding
+        ws_focus_region(start_sec, end_sec) {
+            if (!this.ws_instance) return;
+            const container = this.$refs.waveform_container;
+            if (!container) return;
+            const container_width = container.clientWidth;
+            const duration = end_sec - start_sec;
+            // Zoom so region takes ~60% of visible width
+            const target_zoom = (container_width * 0.6) / duration;
+            this._ws_zoom = Math.max(10, Math.min(800, target_zoom));
+            this.ws_instance.zoom(this._ws_zoom);
+            // Scroll to center the region (after zoom redraws)
+            this.$nextTick(() => {
+                const center_px = ((start_sec + end_sec) / 2) * this._ws_zoom;
+                const scroll_to = center_px - container_width / 2;
+                container.scrollLeft = Math.max(0, scroll_to);
+            });
         },
 
         // Zoom: pixels per second of audio. Higher = more spread out.
