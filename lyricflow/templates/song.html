@@ -108,12 +108,20 @@
             </template>
         </div>
 
-        <!-- Dynamic hint text -->
-        <div class="waveform-help">
-            <span x-show="ws_selected_line === null">Select a line below, then tap the waveform to mark its start &amp; end.</span>
-            <span x-show="ws_tap_mode === 'start'" style="color: var(--green); font-weight: 600;">&#9654; Tap waveform to mark START</span>
-            <span x-show="ws_tap_mode === 'end'" style="color: var(--accent); font-weight: 600;">&#9654; Now tap to mark END</span>
-            <span x-show="ws_selected_line !== null && ws_tap_mode === null && sync_marks[ws_selected_line] && sync_marks[ws_selected_line].start_time_ms !== null">Drag region edges to adjust. Tap &#10005; to redo.</span>
+        <!-- Mark START / END buttons + hint text -->
+        <div class="waveform-mark-bar">
+            <template x-if="ws_selected_line === null">
+                <span class="waveform-hint">Select a line below to begin</span>
+            </template>
+            <template x-if="ws_selected_line !== null && ws_tap_mode === 'start'">
+                <button class="waveform-mark-btn mark-start" @click="ws_mark_start()">&#9654; Mark START</button>
+            </template>
+            <template x-if="ws_selected_line !== null && ws_tap_mode === 'end'">
+                <button class="waveform-mark-btn mark-end" @click="ws_mark_end()">&#9632; Mark END</button>
+            </template>
+            <template x-if="ws_selected_line !== null && ws_tap_mode === null && sync_marks[ws_selected_line] && sync_marks[ws_selected_line].start_time_ms !== null">
+                <span class="waveform-hint">Drag edges to adjust &bull; tap &#10005; to redo</span>
+            </template>
         </div>
     </div>
 
@@ -995,6 +1003,40 @@ function songPage(song_id) {
                     if (!this.ws_playing) this.ws_instance.play();
                 }
             }
+        },
+
+        // Capture current playback time as line start
+        ws_mark_start() {
+            if (!this.ws_instance || this.ws_selected_line === null) return;
+            this.ws_tap_start_sec = this.ws_instance.getCurrentTime();
+            this.ws_tap_mode = 'end';
+        },
+
+        // Capture current playback time as line end, create region
+        ws_mark_end() {
+            if (!this.ws_instance || this.ws_selected_line === null) return;
+            let s = this.ws_tap_start_sec;
+            let e = this.ws_instance.getCurrentTime();
+            // Swap if somehow reversed
+            if (e < s) { const tmp = s; s = e; e = tmp; }
+            // Minimum 0.3s
+            if (e - s < 0.3) e = s + 0.3;
+
+            const mark = this.sync_marks[this.ws_selected_line];
+            mark.start_time_ms = Math.round(s * 1000);
+            mark.end_time_ms = Math.round(e * 1000);
+
+            // Create the visual region
+            const colors = this.ws_generate_colors(this.sync_marks.length);
+            const region = this.ws_regions.addRegion({
+                start: s, end: e,
+                color: colors[this.ws_selected_line],
+                drag: true, resize: true,
+                id: 'line-' + this.ws_selected_line,
+            });
+            this.ws_region_map[this.ws_selected_line] = region;
+            this.ws_tap_mode = null;
+            this.ws_tap_start_sec = null;
         },
 
         // Zoom: pixels per second of audio. Higher = more spread out.
