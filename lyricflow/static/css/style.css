@@ -1684,6 +1684,80 @@ a.card-link {
     color: #fff;
 }
 
+/* ===== TRIM BAR (Apple Photos-style drag handles) ===== */
+.trim-container {
+    width: 100%;
+    padding: 0 8px;
+}
+
+.trim-bar {
+    position: relative;
+    width: 100%;
+    height: 48px;
+    touch-action: none;  /* prevent scroll while dragging handles */
+}
+
+.trim-track {
+    position: absolute;
+    left: 0; right: 0;
+    top: 10px; bottom: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+}
+
+.trim-fill {
+    position: absolute;
+    top: 10px; bottom: 10px;
+    background: rgba(155, 45, 94, 0.3);
+    border-top: 2px solid rgba(155, 45, 94, 0.6);
+    border-bottom: 2px solid rgba(155, 45, 94, 0.6);
+}
+
+/* Drag handle: 44px wide touch target, centered on the boundary */
+.trim-handle {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 44px;
+    transform: translateX(-50%);
+    cursor: col-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+}
+
+/* Visible grip bar inside the handle */
+.trim-handle::after {
+    content: '';
+    width: 6px;
+    height: 28px;
+    border-radius: 3px;
+}
+
+.trim-handle-left::after {
+    background: var(--green);
+}
+
+.trim-handle-right::after {
+    background: var(--accent);
+}
+
+/* Wider visual on active drag */
+.trim-handle:active::after {
+    width: 8px;
+    height: 32px;
+}
+
+.trim-times {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2px 4px;
+    font-size: 0.7rem;
+    font-family: monospace;
+    color: var(--text-dim);
+}
+
 .btn-secondary {
     display: block;
     width: 100%;

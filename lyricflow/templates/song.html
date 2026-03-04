@@ -55,27 +55,18 @@
 
         <!-- Playback controls -->
         <div class="waveform-controls">
-            <button class="waveform-zoom-btn" @click="ws_zoom_out()" title="Zoom out">&minus;</button>
             <button
                 class="waveform-play-btn"
                 @click="ws_toggle_play()"
                 x-text="ws_playing ? '\u23F8 Pause' : '\u25B6 Play'"
             ></button>
-            <button class="waveform-zoom-btn" @click="ws_zoom_in()" title="Zoom in">+</button>
-            <button
-                class="waveform-loop-btn"
-                :class="{ active: ws_loop_selected }"
-                @click="ws_toggle_loop()"
-                x-show="ws_selected_line !== null"
-            >
-                Loop
-            </button>
             <button
                 class="waveform-delete-btn"
                 @click="ws_delete_region()"
                 x-show="ws_selected_line !== null && sync_marks[ws_selected_line] && sync_marks[ws_selected_line].start_time_ms !== null"
+                title="Redo this line"
             >
-                &#10005;
+                Redo
             </button>
             <span class="waveform-time" x-text="ws_current_time_display"></span>
         </div>
@@ -108,10 +99,10 @@
             </template>
         </div>
 
-        <!-- Mark START / END buttons + hint text -->
+        <!-- Mark START / END buttons OR trim bar -->
         <div class="waveform-mark-bar">
             <template x-if="ws_selected_line === null">
-                <span class="waveform-hint">Select a line below to begin</span>
+                <span class="waveform-hint">Select a line, then press Play</span>
             </template>
             <template x-if="ws_selected_line !== null && ws_tap_mode === 'start'">
                 <button class="waveform-mark-btn mark-start" @click="ws_mark_start()">&#9654; Mark START</button>
@@ -119,8 +110,35 @@
             <template x-if="ws_selected_line !== null && ws_tap_mode === 'end'">
                 <button class="waveform-mark-btn mark-end" @click="ws_mark_end()">&#9632; Mark END</button>
             </template>
+            <!-- Apple-style trim bar: drag left/right handles to adjust boundaries -->
             <template x-if="ws_selected_line !== null && ws_tap_mode === null && sync_marks[ws_selected_line] && sync_marks[ws_selected_line].start_time_ms !== null">
-                <span class="waveform-hint">Drag edges to adjust &bull; tap &#10005; to redo</span>
+                <div class="trim-container">
+                    <div class="trim-bar" x-ref="trim_bar">
+                        <div class="trim-track"></div>
+                        <div class="trim-fill" :style="'left:' + trim_left_pct + '%; width:' + (trim_right_pct - trim_left_pct) + '%'"></div>
+                        <div class="trim-handle trim-handle-left"
+                             :style="'left:' + trim_left_pct + '%'"
+                             @touchstart.prevent="trim_drag_start('start', $event)"
+                             @mousedown.prevent="trim_drag_start('start', $event)"
+                             @touchmove.prevent="trim_drag_move($event)"
+                             @touchend="trim_drag_end()"
+                             @mouseup="trim_drag_end()">
+                        </div>
+                        <div class="trim-handle trim-handle-right"
+                             :style="'left:' + trim_right_pct + '%'"
+                             @touchstart.prevent="trim_drag_start('end', $event)"
+                             @mousedown.prevent="trim_drag_start('end', $event)"
+                             @touchmove.prevent="trim_drag_move($event)"
+                             @touchend="trim_drag_end()"
+                             @mouseup="trim_drag_end()">
+                        </div>
+                    </div>
+                    <div class="trim-times">
+                        <span x-text="format_time(sync_marks[ws_selected_line].start_time_ms)"></span>
+                        <span>drag handles to trim</span>
+                        <span x-text="format_time(sync_marks[ws_selected_line].end_time_ms)"></span>
+                    </div>
+                </div>
             </template>
         </div>
     </div>
@@ -348,6 +366,15 @@ function songPage(song_id) {
         ws_current_time_display: '0:00.0',
         ws_tap_mode: null,       // null | 'start' | 'end'
         ws_tap_start_sec: null,  // temp start time while waiting for end tap
+
+        /* -- Trim bar state ----------------------------------- */
+        trim_left_pct: 20,      // left handle position as % of bar width
+        trim_right_pct: 80,     // right handle position as %
+        trim_window_start: 0,   // time window start (seconds)
+        trim_window_end: 10,    // time window end (seconds)
+        _trim_dragging: null,   // 'start' | 'end' | null
+        _trim_drag_start_x: 0,
+        _trim_drag_start_pct: 0,
 
         /* -- Touch gesture ------------------------------------ */
         touch_start_y: 0,
@@ -969,11 +996,14 @@ function songPage(song_id) {
 
             const mark = this.sync_marks[index];
 
-            // If line already has a region, zoom to it and loop
+            // If line already has a region, zoom to it, show trim bar, and loop
             if (mark.start_time_ms !== null && this.ws_instance) {
-                this.ws_focus_region(mark.start_time_ms / 1000, mark.end_time_ms / 1000);
+                const s = mark.start_time_ms / 1000;
+                const e = mark.end_time_ms / 1000;
+                this.ws_focus_region(s, e);
+                this.trim_enter(s, e);
                 this.ws_loop_selected = true;
-                this.ws_instance.setTime(mark.start_time_ms / 1000);
+                this.ws_instance.setTime(s);
                 if (!this.ws_playing) this.ws_instance.play();
                 return;
             }
@@ -1039,10 +1069,11 @@ function songPage(song_id) {
             this.ws_tap_mode = null;
             this.ws_tap_start_sec = null;
 
-            // Auto-zoom so region fills ~60% of screen width, with padding
+            // Zoom waveform to region + set up trim bar
             this.ws_focus_region(s, e);
+            this.trim_enter(s, e);
 
-            // Auto-loop the region so user hears it and can drag edges
+            // Auto-loop so user hears it and can drag trim handles
             this.ws_loop_selected = true;
             this.ws_instance.setTime(s);
             if (!this.ws_playing) this.ws_instance.play();
@@ -1065,6 +1096,91 @@ function songPage(song_id) {
                 const scroll_to = center_px - container_width / 2;
                 container.scrollLeft = Math.max(0, scroll_to);
             });
+        },
+
+        /* ===== TRIM BAR (Apple Photos-style handles) ========= */
+
+        // Set up the trim bar time window around a region
+        trim_enter(start_sec, end_sec) {
+            const song_dur = this.ws_instance ? this.ws_instance.getDuration() : 300;
+            const region_dur = end_sec - start_sec;
+            // Padding: at least 2s or 50% of region on each side
+            const padding = Math.max(2, region_dur * 0.5);
+            this.trim_window_start = Math.max(0, start_sec - padding);
+            this.trim_window_end = Math.min(song_dur, end_sec + padding);
+            this.trim_update_pct();
+        },
+
+        // Sync handle positions from sync_marks times
+        trim_update_pct() {
+            if (this.ws_selected_line === null) return;
+            const mark = this.sync_marks[this.ws_selected_line];
+            if (!mark || mark.start_time_ms === null) return;
+            const dur = this.trim_window_end - this.trim_window_start;
+            if (dur <= 0) return;
+            this.trim_left_pct = ((mark.start_time_ms / 1000) - this.trim_window_start) / dur * 100;
+            this.trim_right_pct = ((mark.end_time_ms / 1000) - this.trim_window_start) / dur * 100;
+        },
+
+        // Start dragging a trim handle
+        trim_drag_start(which, event) {
+            this._trim_dragging = which;
+            const pt = event.touches ? event.touches[0] : event;
+            this._trim_drag_start_x = pt.clientX;
+            this._trim_drag_start_pct = which === 'start' ? this.trim_left_pct : this.trim_right_pct;
+
+            // For mouse: attach move/up to document so drag works outside handle
+            if (!event.touches) {
+                const move_handler = (e) => this.trim_drag_move(e);
+                const up_handler = () => {
+                    this.trim_drag_end();
+                    document.removeEventListener('mousemove', move_handler);
+                    document.removeEventListener('mouseup', up_handler);
+                };
+                document.addEventListener('mousemove', move_handler);
+                document.addEventListener('mouseup', up_handler);
+            }
+        },
+
+        // Drag in progress — update handle position + sync_marks + WaveSurfer region
+        trim_drag_move(event) {
+            if (!this._trim_dragging) return;
+            const bar = this.$refs.trim_bar;
+            if (!bar) return;
+            const pt = event.touches ? event.touches[0] : event;
+            const bar_width = bar.clientWidth;
+            const dx = pt.clientX - this._trim_drag_start_x;
+            const delta_pct = (dx / bar_width) * 100;
+            let new_pct = this._trim_drag_start_pct + delta_pct;
+
+            // Keep handles at least 3% apart (prevents zero-length region)
+            const min_gap = 3;
+            if (this._trim_dragging === 'start') {
+                new_pct = Math.max(0, Math.min(new_pct, this.trim_right_pct - min_gap));
+                this.trim_left_pct = new_pct;
+            } else {
+                new_pct = Math.max(this.trim_left_pct + min_gap, Math.min(100, new_pct));
+                this.trim_right_pct = new_pct;
+            }
+
+            // Convert % back to milliseconds and update the data
+            const window_dur = this.trim_window_end - this.trim_window_start;
+            const mark = this.sync_marks[this.ws_selected_line];
+            if (this._trim_dragging === 'start') {
+                mark.start_time_ms = Math.round((this.trim_window_start + (this.trim_left_pct / 100) * window_dur) * 1000);
+            } else {
+                mark.end_time_ms = Math.round((this.trim_window_start + (this.trim_right_pct / 100) * window_dur) * 1000);
+            }
+
+            // Keep the WaveSurfer region in sync visually
+            const region = this.ws_region_map[this.ws_selected_line];
+            if (region) {
+                region.setOptions({ start: mark.start_time_ms / 1000, end: mark.end_time_ms / 1000 });
+            }
+        },
+
+        trim_drag_end() {
+            this._trim_dragging = null;
         },
 
         // Zoom: pixels per second of audio. Higher = more spread out.
