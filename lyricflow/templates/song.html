@@ -428,7 +428,7 @@ function songPage(song_id) {
             this.current_line = line;
             this.active_line_id = line.id;
             this.translation_hidden = false;
-            this.current_loop = 0;
+            this.current_loop = line.loop_count || 0;
             this.is_paused = false;
             this.show_gear_menu = false;
             this.line_progress = 0;
@@ -483,7 +483,7 @@ function songPage(song_id) {
             }
             this.current_line = prev;
             this.active_line_id = prev.id;
-            this.current_loop = 0;
+            this.current_loop = prev.loop_count || 0;
             this.line_progress = 0;
             this.show_gear_menu = false;
             this.start_line_loop(prev);
@@ -503,7 +503,7 @@ function songPage(song_id) {
             }
             this.current_line = next;
             this.active_line_id = next.id;
-            this.current_loop = 0;
+            this.current_loop = next.loop_count || 0;
             this.line_progress = 0;
             this.show_gear_menu = false;
             this.start_line_loop(next);
@@ -702,6 +702,8 @@ function songPage(song_id) {
                 if (this.audio.currentTime >= end_sec) {
                     this.audio.pause();
                     this.current_loop++;
+                    // Keep the line object in sync so it persists across card opens
+                    line.loop_count = this.current_loop;
                     this._loop_state = 'waiting';
 
                     fetch('/api/lyrics/' + line.id + '/loop', { method: 'PUT' });
