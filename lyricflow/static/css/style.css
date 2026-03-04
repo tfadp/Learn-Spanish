@@ -1471,6 +1471,19 @@ a.card-link {
     padding: 12px 16px;
     flex-shrink: 0;
     touch-action: none;  /* prevent scroll when dragging regions */
+    overflow-x: auto;    /* allow horizontal scroll when zoomed */
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Make WaveSurfer region drag handles fat enough for fingers */
+.waveform-container [data-resize] {
+    width: 20px !important;
+    cursor: col-resize !important;
+}
+/* Fallback: target the thin handle divs WaveSurfer v7 creates */
+.waveform-container .wavesurfer-region > div:first-child,
+.waveform-container .wavesurfer-region > div:last-child {
+    min-width: 16px !important;
 }
 
 .waveform-controls {
@@ -1496,6 +1509,38 @@ a.card-link {
 }
 
 .waveform-play-btn:active { opacity: 0.8; }
+
+.waveform-zoom-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 1.2rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.waveform-zoom-btn:active { opacity: 0.7; }
+
+.waveform-delete-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(220, 50, 50, 0.2);
+    color: #f66;
+    border: 1px solid rgba(220, 50, 50, 0.3);
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.waveform-delete-btn:active { opacity: 0.7; }
 
 .waveform-loop-btn {
     padding: 8px 16px;
