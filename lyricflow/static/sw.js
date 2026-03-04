@@ -1,26 +1,13 @@
 // LyricFlow Service Worker
-// Caches static assets (CSS, JS, fonts) for fast repeat loads.
-// API calls and audio files are always fetched live.
+// Network-first for everything: always fetch fresh from server,
+// fall back to cache only when offline.
 
-const CACHE_NAME = 'lyricflow-v13';
+const CACHE_NAME = 'lyricflow-v14';
 
-// Assets to pre-cache on install
-const PRECACHE_URLS = [
-  '/static/css/style.css?v=12',
-  '/static/js/app.js?v=12',
-  '/static/icons/icon-512.svg',
-];
+// Install: skip waiting so new SW activates immediately
+self.addEventListener('install', () => self.skipWaiting());
 
-// Install: pre-cache core assets
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
-      .then(() => self.skipWaiting())
-  );
-});
-
-// Activate: clean up old caches
+// Activate: delete ALL old caches, then claim clients
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((names) =>
@@ -33,46 +20,25 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch strategy:
-// - /static/* → stale-while-revalidate (fast loads, background update)
-// - HTML pages → network-first (always get fresh HTML from server)
-// - API, audio → skip (let browser handle normally)
+// Fetch: network-first for static assets and pages.
+// API calls and audio are not intercepted at all.
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Skip non-GET requests
   if (event.request.method !== 'GET') return;
-
-  // API calls — always go to network
   if (url.pathname.startsWith('/api/')) return;
-
-  // Audio files — always go to network (too large to cache)
   if (url.pathname.endsWith('.mp3')) return;
 
-  // Static assets only: stale-while-revalidate
-  if (url.pathname.startsWith('/static/')) {
-    event.respondWith(
-      caches.open(CACHE_NAME).then((cache) =>
-        cache.match(event.request).then((cached) => {
-          const fetched = fetch(event.request).then((response) => {
-            if (response.ok) {
-              cache.put(event.request, response.clone());
-            }
-            return response;
-          }).catch(() => cached);
-
-          return cached || fetched;
-        })
-      )
-    );
-    return;
-  }
-
-  // HTML pages: network-first (always get fresh content from server)
-  // Falls back to cache only if network is down (true offline mode)
+  // Network-first: try server, cache the response, fall back to cache
   event.respondWith(
-    fetch(event.request).catch(() =>
-      caches.match(event.request)
-    )
+    fetch(event.request)
+      .then((response) => {
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });

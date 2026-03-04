@@ -5,6 +5,7 @@ This wires together: database, routes, templates, and static files.
 Run with: uvicorn lyricflow.main:app --reload
 """
 
+import hashlib
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -23,6 +24,23 @@ from .routes import songs, lyrics, upload, translate, timestamps
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 TEMPLATES_DIR = BASE_DIR / "templates"
+
+
+def _asset_version() -> str:
+    """Build a short hash from CSS + JS file contents.
+
+    Changes every time style.css or app.js is modified, which
+    automatically busts Safari / service-worker caches on deploy.
+    """
+    h = hashlib.md5()
+    for name in ("css/style.css", "js/app.js"):
+        path = STATIC_DIR / name
+        if path.exists():
+            h.update(path.read_bytes())
+    return h.hexdigest()[:8]
+
+
+ASSET_VERSION = _asset_version()
 
 
 @asynccontextmanager
@@ -55,6 +73,7 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+templates.env.globals["v"] = ASSET_VERSION
 
 # --- API routes (all prefixed with /api) ---
 app.include_router(songs.router, prefix="/api")
@@ -78,21 +97,28 @@ async def service_worker():
 
 # --- Page routes (serve HTML templates) ---
 
+_NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate"}
+
+
 @app.get("/")
 async def library_page(request: Request):
     """Song library — the home screen."""
-    return templates.TemplateResponse("library.html", {"request": request})
+    return templates.TemplateResponse(
+        "library.html", {"request": request}, headers=_NO_CACHE
+    )
 
 
 @app.get("/songs/new")
 async def add_song_page(request: Request):
     """Multi-step form to add a new song."""
-    return templates.TemplateResponse("add_song.html", {"request": request})
+    return templates.TemplateResponse(
+        "add_song.html", {"request": request}, headers=_NO_CACHE
+    )
 
 
 @app.get("/song/{song_id}")
 async def song_page(request: Request, song_id: int):
     """Individual song view — lyric lines, looping, mastery."""
     return templates.TemplateResponse(
-        "song.html", {"request": request, "song_id": song_id}
+        "song.html", {"request": request, "song_id": song_id}, headers=_NO_CACHE
     )
