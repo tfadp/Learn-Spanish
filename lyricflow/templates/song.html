@@ -585,12 +585,21 @@ function songPage(song_id) {
                 if (this._loop_state === 'paused_in_gap') {
                     // Resume from gap: restart the 1s gap timer
                     this._loop_state = 'waiting';
+                    const resume_start = this.current_line.start_time_ms / 1000;
                     this._restart_timeout = setTimeout(() => {
                         if (this._loop_state !== 'waiting') return;
-                        this._loop_state = 'playing';
                         if (!this.show_line_card || this.is_paused) return;
-                        this.audio.currentTime = this.current_line.start_time_ms / 1000;
-                        this.audio.play().catch(() => {});
+                        // Seek first, play after seek confirms position
+                        this.audio.currentTime = resume_start;
+                        const on_seeked = () => {
+                            this._loop_state = 'playing';
+                            this.audio.play().catch(() => {});
+                        };
+                        if (Math.abs(this.audio.currentTime - resume_start) < 0.1) {
+                            on_seeked();
+                        } else {
+                            this.audio.addEventListener('seeked', on_seeked, { once: true });
+                        }
                     }, 1000);
                 } else {
                     this.audio.play();
@@ -647,7 +656,15 @@ function songPage(song_id) {
                         this.audio.currentTime = start_sec;
                         this.stack_current_id = sl[0].id;
                         this.stack_current_number = sl[0].line_number;
-                        this.audio.play().catch(() => {});
+                        const on_seeked = () => {
+                            this._loop_state = 'playing';
+                            this.audio.play().catch(() => {});
+                        };
+                        if (Math.abs(this.audio.currentTime - start_sec) < 0.1) {
+                            on_seeked();
+                        } else {
+                            this.audio.addEventListener('seeked', on_seeked, { once: true });
+                        }
                     }, 1000);
                 } else {
                     this.audio.play();
@@ -658,7 +675,7 @@ function songPage(song_id) {
         /* ===== AUDIO ENGINE ================================== */
 
         /*
-            Single-line loop: seek to start, poll 50ms, pause at end,
+            Single-line loop: seek to start, poll 20ms, pause at end,
             ~1s gap (SPECS.md D), re-seek, play again.
         */
         start_line_loop(line) {
@@ -674,32 +691,54 @@ function songPage(song_id) {
             const start_sec = line.start_time_ms / 1000;
             const end_sec = line.end_time_ms / 1000;
 
-            const begin_loop = () => {
+            // Seek first, wait for browser to confirm position, then play.
+            // This prevents the "wrong position" bug on iOS Safari where
+            // play() starts before the seek completes.
+            const safe_seek_and_play = () => {
                 this.audio.currentTime = start_sec;
-                this.audio.play().catch(err => console.warn('Autoplay blocked:', err));
-                this._loop_state = 'playing';
+                const on_seeked = () => {
+                    this._loop_state = 'playing';
+                    this.audio.play().catch(err => console.warn('Autoplay blocked:', err));
+                };
+                // If seek lands instantly (common when audio is buffered), fire right away
+                if (this.audio.readyState >= 1 && Math.abs(this.audio.currentTime - start_sec) < 0.1) {
+                    on_seeked();
+                } else {
+                    this.audio.addEventListener('seeked', on_seeked, { once: true });
+                }
             };
 
             const needs_load = !this.audio.src || !this.audio.src.includes(this.song.audio_file_path);
             if (needs_load) {
                 this.audio.src = src;
-                this.audio.addEventListener('loadedmetadata', begin_loop, { once: true });
+                this.audio.addEventListener('loadedmetadata', () => safe_seek_and_play(), { once: true });
                 this.audio.addEventListener('error', () => {
                     console.error('Audio failed to load:', src);
                 }, { once: true });
             } else {
-                begin_loop();
+                safe_seek_and_play();
             }
 
+            // Poll every 20ms (was 50ms) for tighter end-detection — reduces
+            // overshoot from ~50ms to ~20ms so less bleed into the next line.
             this.loop_interval = setInterval(() => {
                 if (this._loop_state !== 'playing' || this.is_paused) return;
 
+                const now = this.audio.currentTime;
+
+                // Drift guard: if playback drifted before our start boundary
+                // (MP3 frame-seek inaccuracy), snap back immediately
+                if (now < start_sec - 0.05) {
+                    this.audio.currentTime = start_sec;
+                    return;
+                }
+
                 // Update playback progress bar (0-100%)
-                const elapsed = this.audio.currentTime - start_sec;
+                const elapsed = now - start_sec;
                 const duration = end_sec - start_sec;
                 this.line_progress = Math.max(0, Math.min(100, (elapsed / duration) * 100));
 
-                if (this.audio.currentTime >= end_sec) {
+                if (now >= end_sec) {
                     this.audio.pause();
                     this.current_loop++;
                     // Keep the line object in sync so it persists across card opens
@@ -711,13 +750,11 @@ function songPage(song_id) {
                     // Tracked 1s gap timer — can be cancelled by stop_audio()
                     this._restart_timeout = setTimeout(() => {
                         if (this._loop_state !== 'waiting') return;
-                        this._loop_state = 'playing';
                         if (!this.show_line_card || this.is_paused) return;
-                        this.audio.currentTime = start_sec;
-                        this.audio.play().catch(() => {});
+                        safe_seek_and_play();
                     }, 1000);
                 }
-            }, 50);
+            }, 20);
         },
 
         /*
@@ -740,45 +777,60 @@ function songPage(song_id) {
             const start_sec = first_line.start_time_ms / 1000;
             const end_sec = last_line.end_time_ms / 1000;
 
-            const begin_loop = () => {
+            // Seek first, confirm position, then play (same pattern as line loop)
+            const safe_seek_and_play = () => {
                 this.audio.currentTime = start_sec;
-                this.audio.play().catch(err => console.warn('Autoplay blocked:', err));
-                this._loop_state = 'playing';
+                this.stack_current_id = lines[0].id;
+                this.stack_current_number = lines[0].line_number;
+                const on_seeked = () => {
+                    this._loop_state = 'playing';
+                    this.audio.play().catch(err => console.warn('Autoplay blocked:', err));
+                };
+                if (this.audio.readyState >= 1 && Math.abs(this.audio.currentTime - start_sec) < 0.1) {
+                    on_seeked();
+                } else {
+                    this.audio.addEventListener('seeked', on_seeked, { once: true });
+                }
             };
 
             const needs_load = !this.audio.src || !this.audio.src.includes(this.song.audio_file_path);
             if (needs_load) {
                 this.audio.src = src;
-                this.audio.addEventListener('loadedmetadata', begin_loop, { once: true });
+                this.audio.addEventListener('loadedmetadata', () => safe_seek_and_play(), { once: true });
                 this.audio.addEventListener('error', () => {
                     console.error('Audio failed to load:', src);
                 }, { once: true });
             } else {
-                begin_loop();
+                safe_seek_and_play();
             }
 
+            // 20ms polling for tighter end-detection (was 50ms)
             this.loop_interval = setInterval(() => {
                 if (this._loop_state !== 'playing' || this.stack_paused) return;
 
-                const current_ms = this.audio.currentTime * 1000;
+                const now = this.audio.currentTime;
+
+                // Drift guard: snap back if before start boundary
+                if (now < start_sec - 0.05) {
+                    this.audio.currentTime = start_sec;
+                    return;
+                }
+
+                const current_ms = now * 1000;
                 this.update_current_stack_line(current_ms, lines);
 
-                if (this.audio.currentTime >= end_sec) {
+                if (now >= end_sec) {
                     this.audio.pause();
                     this.stack_loop++;
                     this._loop_state = 'waiting';
 
                     this._restart_timeout = setTimeout(() => {
                         if (this._loop_state !== 'waiting') return;
-                        this._loop_state = 'playing';
                         if (!this.show_stack_card || this.stack_paused) return;
-                        this.audio.currentTime = start_sec;
-                        this.stack_current_id = lines[0].id;
-                        this.stack_current_number = lines[0].line_number;
-                        this.audio.play().catch(() => {});
+                        safe_seek_and_play();
                     }, 1000);
                 }
-            }, 50);
+            }, 20);
         },
 
         stop_audio() {
