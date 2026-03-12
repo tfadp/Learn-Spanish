@@ -353,6 +353,7 @@ function songPage(song_id) {
         loop_interval: null,   // setInterval id (50ms polling)
         _restart_timeout: null, // setTimeout id (1s gap timer)
         _loop_state: 'idle',   // 'idle' | 'playing' | 'waiting' | 'paused_in_gap'
+        _loop_gen: 0,          // generation counter — incremented on stop, invalidates orphaned seeked callbacks
 
         /* -- Waveform sync state ------------------------------ */
         syncing: false,
@@ -591,7 +592,9 @@ function songPage(song_id) {
                         if (!this.show_line_card || this.is_paused) return;
                         // Seek first, play after seek confirms position
                         this.audio.currentTime = resume_start;
+                        const gen = this._loop_gen;
                         const on_seeked = () => {
+                            if (this._loop_gen !== gen) return; // stale
                             this._loop_state = 'playing';
                             this.audio.play().catch(() => {});
                         };
@@ -651,12 +654,13 @@ function songPage(song_id) {
                     const start_sec = sl[0].start_time_ms / 1000;
                     this._restart_timeout = setTimeout(() => {
                         if (this._loop_state !== 'waiting') return;
-                        this._loop_state = 'playing';
                         if (!this.show_stack_card || this.stack_paused) return;
                         this.audio.currentTime = start_sec;
                         this.stack_current_id = sl[0].id;
                         this.stack_current_number = sl[0].line_number;
+                        const gen = this._loop_gen;
                         const on_seeked = () => {
+                            if (this._loop_gen !== gen) return;
                             this._loop_state = 'playing';
                             this.audio.play().catch(() => {});
                         };
@@ -696,7 +700,9 @@ function songPage(song_id) {
             // play() starts before the seek completes.
             const safe_seek_and_play = () => {
                 this.audio.currentTime = start_sec;
+                const gen = this._loop_gen;
                 const on_seeked = () => {
+                    if (this._loop_gen !== gen) return; // stale — card closed or line changed
                     this._loop_state = 'playing';
                     this.audio.play().catch(err => console.warn('Autoplay blocked:', err));
                 };
@@ -782,7 +788,9 @@ function songPage(song_id) {
                 this.audio.currentTime = start_sec;
                 this.stack_current_id = lines[0].id;
                 this.stack_current_number = lines[0].line_number;
+                const gen = this._loop_gen;
                 const on_seeked = () => {
+                    if (this._loop_gen !== gen) return; // stale — card closed
                     this._loop_state = 'playing';
                     this.audio.play().catch(err => console.warn('Autoplay blocked:', err));
                 };
@@ -834,6 +842,8 @@ function songPage(song_id) {
         },
 
         stop_audio() {
+            // Bump generation so any pending seeked callbacks become stale
+            this._loop_gen++;
             if (this.audio) this.audio.pause();
             if (this.loop_interval) {
                 clearInterval(this.loop_interval);
