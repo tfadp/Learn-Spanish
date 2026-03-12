@@ -3,11 +3,21 @@
 ## Session State
 - **Branch**: main
 - **Last test result**: 13/13 passed
-- **Last commit**: e5702fa — Fix review issues, add PWA icons, and polish mastery animation
+- **Last commit**: 6082a29 — Fix review issues: premature loop_state, orphaned seeked listeners
 - **Blockers**: None
 - **Pending decisions**: None
 
 ## Completed Tasks
+
+### Session 8 (2026-03-11)
+- [x] Investigate inconsistent loop playback (audio playing part of another verse)
+- [x] Fix seek-before-play race condition (iOS Safari plays from wrong position)
+- [x] Reduce polling interval from 50ms to 20ms for tighter end-detection
+- [x] Add drift guard (snap back if audio.currentTime drifts before start boundary)
+- [x] Apply same fixes to stack loop engine and both pause-resume paths
+- [x] Fix premature _loop_state='playing' in stack pause-resume (review finding)
+- [x] Add _loop_gen generation counter to invalidate orphaned seeked callbacks
+- [x] Run /review — 1 critical + 2 warnings found, critical + 1 warning fixed
 
 ### Session 7 (2026-03-03)
 - [x] Fix all 24 /review issues (grouped into 7 fix tasks)
@@ -28,6 +38,8 @@
 - [x] Push to GitHub + provide deploy instructions
 
 ## Backlog
+- [ ] Deploy latest to droplet and test loop fix on iPhone
 - [ ] Test PWA installability on iPhone Safari (Add to Home Screen)
 - [ ] Test PWA installability on Chrome Android
 - [ ] Consider adding a second song to test multi-song flows
+- [ ] Extract shared _safe_seek helper to reduce duplication (review suggestion #4)

@@ -1,5 +1,32 @@
 # LyricFlow — Lessons Learned
 
+## Session 8 (2026-03-11)
+
+### Lesson 1: HTML5 Audio seeking is not instant — wait for `seeked` event
+Setting `audio.currentTime = X` and immediately calling `audio.play()` can
+start playback from the wrong position, especially on iOS Safari. The browser
+needs to decode/seek to the nearest MP3 frame first. Fix: listen for the
+`seeked` event before calling `play()`, with a fast-path for when the seek
+lands instantly (buffered audio).
+
+### Lesson 2: Polling interval determines overshoot — use 20ms not 50ms
+A 50ms setInterval for end-detection means audio can overshoot the loop
+boundary by up to 50ms — enough to hear a snippet of the next verse. 20ms
+cuts max bleed to 20ms, which is below perceptible threshold for speech.
+
+### Lesson 3: Generation counters prevent zombie async callbacks
+When using `addEventListener('seeked', callback, { once: true })`, the
+callback can fire after the context that created it is gone (e.g., card
+closed, line changed). A generation counter (`_loop_gen++` on stop, check
+in callback) cheaply invalidates stale callbacks without needing to track
+and remove specific listeners.
+
+### Lesson 4: MP3 frame-seek inaccuracy causes drift
+MP3 seeking lands on the nearest frame boundary, not the exact requested
+time. This means `audio.currentTime` after a seek can be slightly before
+the requested start, causing playback of the previous line. Fix: drift
+guard in the polling loop — if `currentTime < start_sec - 0.05`, re-seek.
+
 ## Session 7 (2026-03-03)
 
 ### Lesson 1: Check what already exists before planning new work
